@@ -25,6 +25,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [activeRole, setActiveRole] = useState("driver");
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
   const shake = () => {
@@ -72,112 +73,160 @@ export default function LoginScreen() {
     }
   };
 
+  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+
   return (
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top }]}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
-              <Feather name="truck" size={36} color={Colors.primary} />
-            </View>
-          </View>
-          <Text style={styles.appName}>بايلوت</Text>
-          <Text style={styles.appTagline}>منصة توصيل الطلبات</Text>
+    <View style={styles.container}>
+      {/* Background glow effects */}
+      <View style={styles.glowTopRight} />
+      <View style={styles.glowBottomLeft} />
+
+      {/* Top Status Pills */}
+      <View style={[styles.statusContainer, { paddingTop: topPadding + 10 }]}>
+        <View style={styles.statusPill}>
+          <Text style={styles.statusPillText}>متصل بالشبكة</Text>
+          <View style={styles.statusDot} />
         </View>
+        <View style={styles.statusPill}>
+          <Text style={styles.statusPillText}>١٢٤ طيار نشط</Text>
+          <Feather name="users" size={12} color={Colors.textSecondary} />
+        </View>
+      </View>
 
-        <Animated.View
-          style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <Text style={styles.cardTitle}>تسجيل الدخول</Text>
-          <Text style={styles.cardSubtitle}>
-            أدخل بياناتك للمتابعة
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>رقم الهاتف</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="01xxxxxxxxx"
-                placeholderTextColor={Colors.textMuted}
-                keyboardType="phone-pad"
-                textAlign="right"
-                selectionColor={Colors.primary}
-                editable={!loading}
-              />
-              <View style={styles.inputIcon}>
-                <Feather name="phone" size={18} color={Colors.textMuted} />
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <View style={styles.logoCircle}>
+                <Feather name="truck" size={36} color="#FFFFFF" />
               </View>
             </View>
+            <Text style={styles.appName}>بايلوت</Text>
+            <Text style={styles.appTagline}>منصة توصيل ذكية في الوقت الحقيقي</Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>كلمة المرور</Text>
-            <View style={styles.inputWrapper}>
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="••••••••"
-                placeholderTextColor={Colors.textMuted}
-                secureTextEntry={!showPassword}
-                textAlign="right"
-                selectionColor={Colors.primary}
-                editable={!loading}
-              />
-              <Pressable
-                style={styles.inputIcon}
-                onPress={() => setShowPassword((v) => !v)}
-              >
-                <Feather
-                  name={showPassword ? "eye-off" : "eye"}
-                  size={18}
-                  color={Colors.textMuted}
-                />
-              </Pressable>
-            </View>
-          </View>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.loginBtn,
-              pressed && styles.loginBtnPressed,
-              loading && styles.loginBtnLoading,
-            ]}
-            onPress={handleLogin}
-            disabled={loading}
+          <Animated.View
+            style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}
           >
-            {loading ? (
-              <Text style={styles.loginBtnText}>جارٍ تسجيل الدخول...</Text>
-            ) : (
-              <Text style={styles.loginBtnText}>تسجيل الدخول</Text>
-            )}
-          </Pressable>
+            {/* Role Selector */}
+            <View style={styles.roleSelector}>
+              {[
+                { id: "admin", label: "المشرف" },
+                { id: "restaurant", label: "المطعم" },
+                { id: "driver", label: "السائق" },
+              ].map((role) => {
+                const isActive = activeRole === role.id;
+                return (
+                  <Pressable
+                    key={role.id}
+                    style={[
+                      styles.roleTab,
+                      isActive && styles.roleTabActive,
+                    ]}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setActiveRole(role.id);
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.roleTabText,
+                        isActive && styles.roleTabTextActive,
+                      ]}
+                    >
+                      {role.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          <View style={styles.hint}>
-            <Feather name="info" size={14} color={Colors.textMuted} />
-            <Text style={styles.hintText}>
-              أدخل أي رقم هاتف (10 أرقام) وكلمة مرور (4 أحرف+)
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>رقم الهاتف</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder="01xxxxxxxxx"
+                  placeholderTextColor={Colors.textMuted}
+                  keyboardType="phone-pad"
+                  textAlign="right"
+                  selectionColor={Colors.primary}
+                  editable={!loading}
+                />
+                <View style={styles.inputIcon}>
+                  <Feather name="phone" size={20} color={Colors.textMuted} />
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>كلمة المرور</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={Colors.textMuted}
+                  secureTextEntry={!showPassword}
+                  textAlign="right"
+                  selectionColor={Colors.primary}
+                  editable={!loading}
+                />
+                <Pressable
+                  style={styles.inputIcon}
+                  onPress={() => setShowPassword((v) => !v)}
+                >
+                  <Feather
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={20}
+                    color={Colors.textMuted}
+                  />
+                </Pressable>
+              </View>
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.loginBtn,
+                pressed && styles.loginBtnPressed,
+                loading && styles.loginBtnLoading,
+              ]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading ? (
+                <Text style={styles.loginBtnText}>جارٍ تسجيل الدخول...</Text>
+              ) : (
+                <Text style={styles.loginBtnText}>تسجيل الدخول</Text>
+              )}
+            </Pressable>
+
+            <View style={styles.hint}>
+              <Text style={styles.hintText}>
+                أدخل أي رقم هاتف (10 أرقام) وكلمة مرور (4 أحرف+)
+              </Text>
+              <Feather name="info" size={14} color={Colors.textMuted} />
+            </View>
+          </Animated.View>
+
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              بتسجيل دخولك، أنت توافق على شروط الخدمة وسياسة الخصوصية
             </Text>
           </View>
-        </Animated.View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            بتسجيل دخولك، أنت توافق على شروط الخدمة وسياسة الخصوصية
-          </Text>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -186,35 +235,91 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  glowTopRight: {
+    position: "absolute",
+    top: -100,
+    right: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    backgroundColor: Colors.primary,
+    opacity: 0.15,
+    filter: "blur(60px)",
+  } as any,
+  glowBottomLeft: {
+    position: "absolute",
+    bottom: -100,
+    left: -100,
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: Colors.accent,
+    opacity: 0.1,
+    filter: "blur(50px)",
+  } as any,
+  statusContainer: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    zIndex: 10,
+  },
+  statusPill: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    backgroundColor: Colors.card,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  statusPillText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.success,
+  },
+  keyboardView: {
+    flex: 1,
+  },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingBottom: 40,
+    justifyContent: "center",
   },
   header: {
     alignItems: "center",
-    paddingTop: 48,
-    paddingBottom: 40,
+    marginBottom: 32,
+    marginTop: 20,
   },
   logoContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 20,
+    elevation: 10,
   },
   logoCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.card,
-    borderWidth: 2,
-    borderColor: Colors.primary,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   appName: {
-    fontSize: 36,
+    fontSize: 38,
     fontFamily: "Inter_700Bold",
     color: Colors.primary,
-    letterSpacing: 1,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   appTagline: {
     fontSize: 15,
@@ -223,31 +328,46 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: Colors.card,
-    borderRadius: 20,
+    borderRadius: 24,
     padding: 24,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: "rgba(255,255,255,0.08)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  cardTitle: {
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    textAlign: "right",
-    marginBottom: 6,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "right",
+  roleSelector: {
+    flexDirection: "row-reverse",
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    padding: 4,
     marginBottom: 28,
+  },
+  roleTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 8,
+  },
+  roleTabActive: {
+    backgroundColor: Colors.primary,
+  },
+  roleTabText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+  },
+  roleTabTextActive: {
+    color: "#000",
   },
   inputGroup: {
     marginBottom: 20,
   },
   inputLabel: {
     fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     textAlign: "right",
     marginBottom: 8,
@@ -255,11 +375,10 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    backgroundColor: Colors.card2,
-    borderRadius: 12,
+    backgroundColor: Colors.background,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 16,
     height: 56,
   },
   input: {
@@ -268,12 +387,17 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.text,
     textAlign: "right",
+    paddingHorizontal: 16,
     paddingVertical: 0,
+    height: "100%",
   },
   inputIcon: {
-    marginLeft: 12,
-    width: 24,
+    width: 48,
+    height: "100%",
     alignItems: "center",
+    justifyContent: "center",
+    borderLeftWidth: 1,
+    borderLeftColor: Colors.border,
   },
   loginBtn: {
     backgroundColor: Colors.primary,
@@ -281,10 +405,10 @@ const styles = StyleSheet.create({
     height: 58,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 12,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.3,
     shadowRadius: 12,
     elevation: 8,
   },
@@ -304,15 +428,15 @@ const styles = StyleSheet.create({
   hint: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    marginTop: 16,
+    justifyContent: "center",
+    marginTop: 20,
     gap: 6,
   },
   hintText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.textMuted,
     textAlign: "right",
-    flex: 1,
   },
   footer: {
     marginTop: 32,

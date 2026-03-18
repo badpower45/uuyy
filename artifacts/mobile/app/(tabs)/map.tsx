@@ -105,7 +105,7 @@ export default function MapScreen() {
 
   const sheetHeight = sheetAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [320, 520],
+    outputRange: [340, 540],
   });
 
   return (
@@ -129,9 +129,9 @@ export default function MapScreen() {
                     i <= stepIndex ? step.color : Colors.card2,
                   borderColor:
                     i === stepIndex ? step.color : Colors.border,
-                  width: i === stepIndex ? 14 : 10,
-                  height: i === stepIndex ? 14 : 10,
-                  borderRadius: i === stepIndex ? 7 : 5,
+                  width: i === stepIndex ? 16 : 12,
+                  height: i === stepIndex ? 16 : 12,
+                  borderRadius: i === stepIndex ? 8 : 6,
                 },
               ]}
             />
@@ -179,7 +179,7 @@ export default function MapScreen() {
           <View style={styles.infoCards}>
             <View style={styles.infoCard}>
               <View style={styles.infoCardIcon}>
-                <Feather name="shopping-bag" size={16} color={Colors.primary} />
+                <Feather name="shopping-bag" size={18} color={Colors.primary} />
               </View>
               <View style={styles.infoCardContent}>
                 <Text style={styles.infoCardTitle}>
@@ -200,7 +200,7 @@ export default function MapScreen() {
                   { backgroundColor: Colors.accent + "22" },
                 ]}
               >
-                <Feather name="user" size={16} color={Colors.accent} />
+                <Feather name="user" size={18} color={Colors.accent} />
               </View>
               <View style={styles.infoCardContent}>
                 <Text style={styles.infoCardTitle}>
@@ -211,7 +211,7 @@ export default function MapScreen() {
                 </Text>
               </View>
               <Pressable style={styles.callBtn} onPress={handleCall}>
-                <Feather name="phone" size={18} color={Colors.success} />
+                <Feather name="phone" size={20} color={Colors.success} />
               </Pressable>
             </View>
           </View>
@@ -229,7 +229,7 @@ export default function MapScreen() {
             </View>
             <View style={styles.cashDivider} />
             <View style={styles.cashItem}>
-              <Text style={styles.cashLabel}>الكاش</Text>
+              <Text style={styles.cashLabel}>الكاش المطلوب</Text>
               <Text style={[styles.cashValue, { color: Colors.success }]}>
                 {activeOrder.cashToCollect} جنيه
               </Text>
@@ -249,7 +249,7 @@ export default function MapScreen() {
           >
             <Feather
               name={(currentStep?.icon as any) || "check"}
-              size={22}
+              size={24}
               color="#000"
             />
             <Text style={styles.actionBtnText}>
@@ -274,14 +274,14 @@ const styles = StyleSheet.create({
   },
   stepsOverlay: {
     position: "absolute",
-    top: 12,
+    top: 16,
     right: 16,
     flexDirection: "row-reverse",
-    gap: 6,
-    backgroundColor: Colors.card + "CC",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
+    gap: 8,
+    backgroundColor: Colors.card + "E6",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 24,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
@@ -291,49 +291,49 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     borderTopWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     overflow: "hidden",
   },
   sheetHandle: {
     alignItems: "center",
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   handleBar: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: 48,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: Colors.border,
   },
   sheetHeader: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   orderIdBadge: {
     backgroundColor: Colors.card2,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   orderIdText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
   },
   statusBadge: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
   },
   statusDot: {
     width: 8,
@@ -341,26 +341,26 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statusBadgeText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
   infoCards: {
     backgroundColor: Colors.card2,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   infoCard: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 12,
+    gap: 16,
   },
   infoCardIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: Colors.primary + "22",
     alignItems: "center",
     justifyContent: "center",
@@ -370,20 +370,20 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   infoCardTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   infoCardAddress: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
   callBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: Colors.success + "22",
     alignItems: "center",
     justifyContent: "center",
@@ -391,14 +391,14 @@ const styles = StyleSheet.create({
   infoDivider: {
     height: 1,
     backgroundColor: Colors.border,
-    marginVertical: 12,
+    marginVertical: 16,
   },
   cashCard: {
     flexDirection: "row-reverse",
     backgroundColor: Colors.card2,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
@@ -408,32 +408,32 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cashLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
     color: Colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   cashValue: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
   cashDivider: {
     width: 1,
-    height: 32,
+    height: 40,
     backgroundColor: Colors.border,
-    marginHorizontal: 4,
+    marginHorizontal: 8,
   },
   actionContainer: {
-    paddingTop: 12,
+    paddingTop: 16,
   },
   actionBtn: {
-    height: 58,
-    borderRadius: 16,
+    height: 60,
+    borderRadius: 18,
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
+    gap: 12,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
@@ -452,9 +452,9 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: Colors.card,
     alignItems: "center",
     justifyContent: "center",
@@ -463,33 +463,33 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     textAlign: "center",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 24,
+    lineHeight: 24,
+    marginBottom: 28,
   },
   emptyHint: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.primary + "18",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    gap: 10,
+    backgroundColor: Colors.primary + "1A",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: Colors.primary + "40",
   },
   emptyHintText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.primary,
   },

@@ -1,16 +1,16 @@
-const PRIMARY = "#F5A623";
-const PRIMARY_DARK = "#E8941A";
-const ACCENT = "#FF6B35";
-const SUCCESS = "#27AE60";
-const DANGER = "#E74C3C";
-const WARNING = "#F39C12";
-const BG_DARK = "#111216";
-const BG_CARD = "#1A1D23";
-const BG_CARD2 = "#22262F";
-const BORDER = "#2E3340";
-const TEXT_PRIMARY = "#FFFFFF";
-const TEXT_SECONDARY = "#9BA3B4";
-const TEXT_MUTED = "#5C6478";
+const PRIMARY = "#22C55E";
+const PRIMARY_DARK = "#16A34A";
+const ACCENT = "#4ADE80";
+const SUCCESS = "#22C55E";
+const DANGER = "#EF4444";
+const WARNING = "#F59E0B";
+const BG_DARK = "#0A0D11";
+const BG_CARD = "#111827";
+const BG_CARD2 = "#1F2937";
+const BORDER = "#374151";
+const TEXT_PRIMARY = "#F9FAFB";
+const TEXT_SECONDARY = "#9CA3AF";
+const TEXT_MUTED = "#4B5563";
 
 export default {
   primary: PRIMARY,
@@ -27,9 +27,9 @@ export default {
   textSecondary: TEXT_SECONDARY,
   textMuted: TEXT_MUTED,
   online: SUCCESS,
-  offline: "#E74C3C",
-  gold: "#FFD700",
-  silver: "#C0C0C0",
+  offline: DANGER,
+  gold: "#FBBF24",
+  silver: "#E5E7EB",
   bronze: "#CD7F32",
   light: {
     text: TEXT_PRIMARY,

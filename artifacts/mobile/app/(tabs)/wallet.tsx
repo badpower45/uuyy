@@ -65,6 +65,8 @@ export default function WalletScreen() {
                   : isNearLimit
                   ? Colors.warning
                   : Colors.border,
+                borderRightWidth: 4,
+                borderRightColor: isDebt ? Colors.danger : Colors.success,
               },
             ]}
           >
@@ -92,7 +94,7 @@ export default function WalletScreen() {
               >
                 <Feather
                   name={isDebt ? "trending-down" : "trending-up"}
-                  size={24}
+                  size={28}
                   color={isDebt ? Colors.danger : Colors.success}
                 />
               </View>
@@ -111,24 +113,24 @@ export default function WalletScreen() {
                             ? Colors.danger
                             : isNearLimit
                             ? Colors.warning
-                            : Colors.primary,
+                            : Colors.success,
                         },
                       ]}
                     />
                   </View>
                   <View style={styles.limitLabels}>
                     <Text style={styles.limitLabel}>
-                      {Math.abs(driver.balance).toFixed(0)} جنيه دين
+                      {Math.abs(driver.balance).toFixed(0)} جنيه مسحوب
                     </Text>
                     <Text style={styles.limitLabel}>
-                      حد {driver.creditLimit} جنيه
+                      الحد {driver.creditLimit} جنيه
                     </Text>
                   </View>
                 </View>
 
                 {isAtLimit && (
                   <View style={[styles.alertBanner, { backgroundColor: Colors.danger + "20", borderColor: Colors.danger }]}>
-                    <Feather name="alert-octagon" size={16} color={Colors.danger} />
+                    <Feather name="alert-octagon" size={18} color={Colors.danger} />
                     <Text style={[styles.alertText, { color: Colors.danger }]}>
                       تجاوزت حد الإيقاف التلقائي — حسابك متوقف مؤقتاً
                     </Text>
@@ -137,7 +139,7 @@ export default function WalletScreen() {
 
                 {isNearLimit && !isAtLimit && (
                   <View style={[styles.alertBanner, { backgroundColor: Colors.warning + "20", borderColor: Colors.warning }]}>
-                    <Feather name="alert-triangle" size={16} color={Colors.warning} />
+                    <Feather name="alert-triangle" size={18} color={Colors.warning} />
                     <Text style={[styles.alertText, { color: Colors.warning }]}>
                       تنبيه: اقتربت من حد الإيقاف التلقائي
                     </Text>
@@ -153,26 +155,26 @@ export default function WalletScreen() {
           <Text style={styles.sectionTitle}>ملخص الأسبوع</Text>
           <View style={styles.summaryGrid}>
             <View style={styles.summaryCard}>
-              <Feather name="truck" size={20} color={Colors.primary} />
+              <Feather name="truck" size={24} color={Colors.primary} />
               <Text style={styles.summaryValue}>{totalTrips}</Text>
               <Text style={styles.summaryLabel}>رحلة</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Feather name="dollar-sign" size={20} color={Colors.success} />
+              <Feather name="dollar-sign" size={24} color={Colors.success} />
               <Text style={[styles.summaryValue, { color: Colors.success }]}>
                 {totalEarnings}
               </Text>
               <Text style={styles.summaryLabel}>أرباح</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Feather name="credit-card" size={20} color={Colors.accent} />
+              <Feather name="credit-card" size={24} color={Colors.accent} />
               <Text style={[styles.summaryValue, { color: Colors.accent }]}>
                 {totalCash}
               </Text>
               <Text style={styles.summaryLabel}>كاش</Text>
             </View>
             <View style={styles.summaryCard}>
-              <Feather name="percent" size={20} color={Colors.danger} />
+              <Feather name="percent" size={24} color={Colors.danger} />
               <Text style={[styles.summaryValue, { color: Colors.danger }]}>
                 {totalCommission}
               </Text>
@@ -211,7 +213,7 @@ export default function WalletScreen() {
                     <Text
                       style={[
                         styles.barLabel,
-                        isSelected && { color: Colors.primary },
+                        isSelected && { color: Colors.primary, fontFamily: "Inter_700Bold" },
                       ]}
                     >
                       {day.date.slice(0, 3)}
@@ -266,7 +268,10 @@ export default function WalletScreen() {
           {weeklyEarnings.map((day, i) => (
             <Pressable
               key={i}
-              style={styles.dayRow}
+              style={[
+                styles.dayRow,
+                selectedDay === i && { borderColor: Colors.primary, backgroundColor: Colors.primary + "11" },
+              ]}
               onPress={() => handleDaySelect(i)}
             >
               <View style={styles.dayRowLeft}>
@@ -279,11 +284,11 @@ export default function WalletScreen() {
               </View>
               <View style={styles.dayRowCenter}>
                 <View style={styles.dayRowMeta}>
-                  <Feather name="credit-card" size={12} color={Colors.textMuted} />
+                  <Feather name="credit-card" size={14} color={Colors.textMuted} />
                   <Text style={styles.dayRowMetaText}>{day.cashCollected} ج</Text>
                 </View>
                 <View style={styles.dayRowMeta}>
-                  <Feather name="minus-circle" size={12} color={Colors.danger} />
+                  <Feather name="minus-circle" size={14} color={Colors.danger} />
                   <Text style={[styles.dayRowMetaText, { color: Colors.danger }]}>
                     {day.commission} ج
                   </Text>
@@ -307,138 +312,138 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     alignItems: "flex-end",
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 24,
+    marginBottom: 28,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
+    color: Colors.text,
     textAlign: "right",
-    marginBottom: 12,
+    marginBottom: 16,
   },
   balanceCard: {
     backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1.5,
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: 1,
   },
   balanceTop: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 20,
   },
   balanceLeft: {
     alignItems: "flex-end",
   },
   balanceLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   balanceAmount: {
-    fontSize: 34,
+    fontSize: 38,
     fontFamily: "Inter_700Bold",
   },
   balanceIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 60,
+    height: 60,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
   limitBar: {
-    marginTop: 4,
+    marginTop: 8,
   },
   limitBarBg: {
-    height: 8,
+    height: 10,
     backgroundColor: Colors.card2,
-    borderRadius: 4,
+    borderRadius: 5,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   limitBarFill: {
     height: "100%",
-    borderRadius: 4,
+    borderRadius: 5,
   },
   limitLabels: {
     flexDirection: "row-reverse",
     justifyContent: "space-between",
   },
   limitLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
   },
   alertBanner: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 12,
-    gap: 8,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 16,
+    gap: 10,
     borderWidth: 1,
   },
   alertText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
     textAlign: "right",
   },
   summaryGrid: {
     flexDirection: "row-reverse",
-    gap: 10,
+    gap: 12,
   },
   summaryCard: {
     flex: 1,
     backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 18,
+    padding: 16,
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
   summaryLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
     color: Colors.textMuted,
   },
   chartCard: {
     backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   barsContainer: {
     flexDirection: "row-reverse",
     alignItems: "flex-end",
-    height: 120,
-    gap: 8,
+    height: 140,
+    gap: 10,
   },
   barWrapper: {
     flex: 1,
@@ -448,69 +453,69 @@ const styles = StyleSheet.create({
   },
   barTrack: {
     width: "100%",
-    height: 96,
+    height: 110,
     justifyContent: "flex-end",
-    borderRadius: 6,
+    borderRadius: 8,
     overflow: "hidden",
   },
   barFill: {
     width: "100%",
-    borderRadius: 6,
-    minHeight: 4,
+    borderRadius: 8,
+    minHeight: 6,
   },
   barLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
-    color: Colors.textMuted,
-    marginTop: 4,
+    color: Colors.textSecondary,
+    marginTop: 8,
   },
   barValue: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     color: Colors.primary,
-    marginTop: 2,
+    marginTop: 4,
   },
   dayDetail: {
     backgroundColor: Colors.card2,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 16,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   dayDetailTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "right",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   dayDetailRow: {
     flexDirection: "row-reverse",
-    gap: 8,
+    gap: 10,
   },
   dayDetailItem: {
     flex: 1,
     alignItems: "center",
   },
   dayDetailLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
     color: Colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   dayDetailValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
   dayRow: {
     backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: "row-reverse",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -519,33 +524,33 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   dayRowTrips: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
-    marginBottom: 2,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    marginBottom: 4,
   },
   dayRowEarnings: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
   },
   dayRowCenter: {
     flex: 1,
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   dayRowMeta: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 4,
+    gap: 6,
   },
   dayRowMetaText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
   dayRowDate: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "left",
