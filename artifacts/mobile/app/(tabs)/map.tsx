@@ -49,7 +49,7 @@ const STATUS_STEPS = [
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { activeOrder, advanceOrderStatus } = useApp();
+  const { activeOrder, advanceOrderStatus, driverLocation, isTrackingLocation } = useApp();
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
 
@@ -115,7 +115,21 @@ export default function MapScreen() {
         <NativeMapView
           restaurantName={activeOrder.restaurantName}
           customerName={activeOrder.customerName}
+          latitude={driverLocation?.latitude}
+          longitude={driverLocation?.longitude}
+          isTracking={isTrackingLocation}
+          accuracy={driverLocation?.accuracy}
         />
+
+        {/* GPS Live Badge */}
+        {isTrackingLocation && driverLocation && (
+          <View style={styles.gpsBadge}>
+            <View style={styles.gpsDot} />
+            <Text style={styles.gpsText}>
+              {driverLocation.latitude.toFixed(4)}, {driverLocation.longitude.toFixed(4)}
+            </Text>
+          </View>
+        )}
 
         {/* Status Steps Overlay */}
         <View style={styles.stepsOverlay}>
@@ -271,6 +285,31 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     flex: 1,
+  },
+  gpsBadge: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(17,24,39,0.90)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderWidth: 1,
+    borderColor: Colors.primary + "50",
+  },
+  gpsDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+  },
+  gpsText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.primary,
   },
   stepsOverlay: {
     position: "absolute",

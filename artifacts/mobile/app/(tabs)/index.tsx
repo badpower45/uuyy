@@ -17,10 +17,10 @@ import { useApp } from "@/context/AppContext";
 import Colors from "@/constants/colors";
 
 const RANK_LABELS: Record<string, string> = {
-  bronze: "الفئة البرونزية",
-  silver: "الفئة الفضية",
-  gold: "الفئة الذهبية",
-  platinum: "الفئة البلاتينية",
+  bronze: "برونزي",
+  silver: "فضي",
+  gold: "ذهبي",
+  platinum: "بلاتيني",
 };
 
 const RANK_COLORS: Record<string, string> = {
@@ -30,39 +30,40 @@ const RANK_COLORS: Record<string, string> = {
   platinum: "#B0E0FF",
 };
 
-const RANK_ICONS: Record<string, string> = {
-  bronze: "award",
-  silver: "award",
-  gold: "award",
-  platinum: "star",
-};
-
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { driver, isOnline, toggleOnline, incomingOrder, acceptOrder, declineOrder, logout } = useApp();
+  const {
+    driver,
+    isOnline,
+    toggleOnline,
+    incomingOrder,
+    acceptOrder,
+    declineOrder,
+    logout,
+    driverLocation,
+    isTrackingLocation,
+    requestLocationPermission,
+    locationPermission,
+  } = useApp();
+
   const [showModal, setShowModal] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const dotAnim = useRef(new Animated.Value(1)).current;
   const modalAnim = useRef(new Animated.Value(0)).current;
+  const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (isOnline) {
-      Animated.loop(
+      loopRef.current = Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
+          Animated.timing(dotAnim, { toValue: 0.3, duration: 600, useNativeDriver: true }),
+          Animated.timing(dotAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
         ])
-      ).start();
+      );
+      loopRef.current.start();
     } else {
-      pulseAnim.stopAnimation();
-      pulseAnim.setValue(1);
+      loopRef.current?.stop();
+      dotAnim.setValue(1);
     }
   }, [isOnline]);
 
@@ -71,7 +72,7 @@ export default function HomeScreen() {
       setShowModal(true);
       Animated.spring(modalAnim, {
         toValue: 1,
-        tension: 100,
+        tension: 90,
         friction: 8,
         useNativeDriver: true,
       }).start();
@@ -79,14 +80,17 @@ export default function HomeScreen() {
     } else {
       Animated.timing(modalAnim, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }).start(() => setShowModal(false));
     }
   }, [incomingOrder]);
 
-  const handleToggle = () => {
+  const handleToggle = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    if (!isOnline && locationPermission === "undetermined") {
+      await requestLocationPermission();
+    }
     toggleOnline();
   };
 
@@ -112,233 +116,264 @@ export default function HomeScreen() {
   const debtRatio = Math.abs(driver.balance) / driver.creditLimit;
   const isNearLimit = debtRatio > 0.7;
   const rankColor = RANK_COLORS[driver.rank] || Colors.gold;
-
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
 
+  const locationLabel = isTrackingLocation && driverLocation
+    ? `${driverLocation.latitude.toFixed(4)}, ${driverLocation.longitude.toFixed(4)}`
+    : locationPermission === "denied"
+    ? "لا يوجد إذن للموقع"
+    : "في انتظار الموقع...";
+
   return (
-    <View style={[styles.container, { paddingTop: topPadding }]}>
+    <View style={[styles.root, { paddingTop: topPadding }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Platform.OS === "web" ? 80 : 110 },
+        ]}
       >
-        {/* Header */}
+        {/* ── Header ── */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Pressable onPress={handleLogout} style={styles.logoutBtn}>
-              <Feather name="log-out" size={20} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-          <View style={styles.headerCenter}>
+          <Pressable onPress={handleLogout} style={styles.iconBtn}>
+            <Feather name="log-out" size={18} color={Colors.textSecondary} />
+          </Pressable>
+          <View style={styles.headerMid}>
             <Text style={styles.driverName}>{driver.name}</Text>
-            <View style={[styles.rankBadge, { backgroundColor: rankColor + "1A", borderColor: rankColor + "40" }]}>
-              <Feather name={RANK_ICONS[driver.rank] as any} size={12} color={rankColor} />
-              <Text style={[styles.rankText, { color: rankColor }]}>
-                {RANK_LABELS[driver.rank]}
+            <View style={[styles.rankPill, { borderColor: rankColor + "50", backgroundColor: rankColor + "15" }]}>
+              <Feather name="award" size={11} color={rankColor} />
+              <Text style={[styles.rankLabel, { color: rankColor }]}>
+                {RANK_LABELS[driver.rank]} • {driver.rating} ★
               </Text>
             </View>
           </View>
-          <View style={styles.headerRight}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{driver.avatar}</Text>
-            </View>
+          <View style={styles.avatarRing}>
+            <Text style={styles.avatarText}>{driver.avatar}</Text>
           </View>
         </View>
 
-        {/* Status Toggle */}
-        <View style={styles.section}>
-          <Animated.View
-            style={[
-              styles.statusCard,
-              {
-                transform: [{ scale: pulseAnim }],
-                borderColor: isOnline ? Colors.online : Colors.offline,
-                backgroundColor: isOnline ? Colors.online + "0A" : Colors.offline + "0A",
-                borderRightWidth: 4,
-                borderRightColor: isOnline ? Colors.online : Colors.offline,
-              },
-            ]}
-          >
-            <View style={styles.statusInfo}>
-              <Text style={styles.statusTitle}>
-                {isOnline ? "متاح للعمل" : "غير متاح"}
-              </Text>
-              <View style={styles.statusSubtitleRow}>
-                {isOnline && <View style={styles.statusDot} />}
-                <Text style={styles.statusSubtitle}>
+        {/* ── Online / Offline Toggle Card ── */}
+        <View style={styles.px}>
+          <View style={[
+            styles.statusCard,
+            { borderColor: isOnline ? Colors.online + "50" : Colors.border },
+          ]}>
+            {/* Side accent */}
+            <View style={[
+              styles.sideAccent,
+              { backgroundColor: isOnline ? Colors.online : Colors.offline },
+            ]} />
+
+            <View style={styles.statusBody}>
+              <View style={styles.statusLeft}>
+                <View style={styles.statusTitleRow}>
+                  <Animated.View style={[
+                    styles.statusDot,
+                    {
+                      backgroundColor: isOnline ? Colors.online : Colors.offline,
+                      opacity: dotAnim,
+                    },
+                  ]} />
+                  <Text style={[
+                    styles.statusTitle,
+                    { color: isOnline ? Colors.online : Colors.text },
+                  ]}>
+                    {isOnline ? "متاح للعمل" : "غير متاح"}
+                  </Text>
+                </View>
+                <Text style={styles.statusSub}>
                   {isOnline
                     ? "أنت متصل وتستقبل الطلبات"
-                    : "اضغط لتبدأ استقبال الطلبات"}
+                    : "اضغط للبدء في استقبال الطلبات"}
                 </Text>
-              </View>
-            </View>
-            <Pressable
-              style={[
-                styles.toggleBtn,
-                { backgroundColor: isOnline ? Colors.online : Colors.card2 },
-              ]}
-              onPress={handleToggle}
-            >
-              <View
-                style={[
-                  styles.toggleKnob,
-                  isOnline && styles.toggleKnobOn,
-                ]}
-              />
-            </Pressable>
-          </Animated.View>
-        </View>
 
-        {/* Wallet Card */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>المحفظة</Text>
-          <View style={styles.walletCard}>
-            <View style={styles.walletHeader}>
-              <Text style={styles.walletLabel}>الرصيد الحالي</Text>
-              <Feather name="credit-card" size={20} color={Colors.textSecondary} />
+                {/* GPS status sub-row */}
+                {isOnline && (
+                  <View style={styles.gpsRow}>
+                    <Feather
+                      name="map-pin"
+                      size={11}
+                      color={isTrackingLocation ? Colors.primary : Colors.textMuted}
+                    />
+                    <Text style={[
+                      styles.gpsText,
+                      { color: isTrackingLocation ? Colors.primary : Colors.textMuted },
+                    ]}>
+                      {isTrackingLocation ? "GPS نشط • " : ""}{locationLabel}
+                    </Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Toggle switch */}
+              <Pressable
+                style={[
+                  styles.toggle,
+                  { backgroundColor: isOnline ? Colors.online : Colors.card2 },
+                ]}
+                onPress={handleToggle}
+              >
+                <View style={[styles.knob, isOnline && styles.knobOn]} />
+              </Pressable>
             </View>
-            <Text
-              style={[
-                styles.balanceAmount,
-                { color: isDebt ? Colors.danger : Colors.success },
-              ]}
-            >
-              {isDebt ? "-" : "+"}{Math.abs(driver.balance).toFixed(2)} جنيه
-            </Text>
-            {isDebt && (
-              <View style={styles.creditBar}>
-                <View style={styles.creditBarBg}>
-                  <View
-                    style={[
-                      styles.creditBarFill,
-                      {
-                        width: `${Math.min(debtRatio * 100, 100)}%` as any,
-                        backgroundColor: isNearLimit ? Colors.danger : Colors.warning,
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={styles.creditText}>
-                  المسحوب {Math.abs(driver.balance).toFixed(0)} / الحد {driver.creditLimit}
-                </Text>
-              </View>
-            )}
-            {isNearLimit && (
-              <View style={styles.warningBanner}>
-                <Feather name="alert-triangle" size={16} color={Colors.danger} />
-                <Text style={styles.warningText}>
-                  اقتربت من الحد الأقصى للمديونية، يرجى التسوية
-                </Text>
-              </View>
-            )}
           </View>
         </View>
 
-        {/* Stats */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>إحصائيات</Text>
+        {/* ── Wallet Card ── */}
+        <View style={styles.px}>
+          <Text style={styles.sectionLabel}>المحفظة</Text>
+          <View style={styles.walletCard}>
+            <View style={[
+              styles.walletAccent,
+              { backgroundColor: isDebt ? Colors.danger : Colors.success },
+            ]} />
+            <View style={styles.walletInner}>
+              <View style={styles.walletTop}>
+                <View style={[
+                  styles.walletIcon,
+                  { backgroundColor: isDebt ? Colors.danger + "18" : Colors.success + "18" },
+                ]}>
+                  <Feather
+                    name="credit-card"
+                    size={18}
+                    color={isDebt ? Colors.danger : Colors.success}
+                  />
+                </View>
+                <Text style={styles.walletLabel}>الرصيد الحالي</Text>
+              </View>
+              <Text style={[
+                styles.balanceText,
+                { color: isDebt ? Colors.danger : Colors.success },
+              ]}>
+                {isDebt ? "−" : "+"}{Math.abs(driver.balance).toFixed(2)}
+                <Text style={styles.currency}> جنيه</Text>
+              </Text>
+
+              {isDebt && (
+                <>
+                  <View style={styles.progressBg}>
+                    <View style={[
+                      styles.progressFill,
+                      {
+                        width: `${Math.min(debtRatio * 100, 100)}%` as any,
+                        backgroundColor: debtRatio > 0.7 ? Colors.danger : Colors.warning,
+                      },
+                    ]} />
+                  </View>
+                  <View style={styles.progressLabelRow}>
+                    <Text style={styles.progressLabel}>
+                      الحد: {driver.creditLimit} جنيه
+                    </Text>
+                    <Text style={[
+                      styles.progressLabel,
+                      { color: debtRatio > 0.7 ? Colors.danger : Colors.warning },
+                    ]}>
+                      {Math.round(debtRatio * 100)}% مستخدم
+                    </Text>
+                  </View>
+                </>
+              )}
+
+              {isNearLimit && (
+                <View style={styles.warnBanner}>
+                  <Feather name="alert-triangle" size={14} color={Colors.danger} />
+                  <Text style={styles.warnText}>
+                    اقتربت من الحد الأقصى — يرجى التسوية
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* ── Stats ── */}
+        <View style={styles.px}>
+          <Text style={styles.sectionLabel}>الإحصائيات</Text>
           <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <View style={[styles.statIconWrapper, { backgroundColor: Colors.primary + "1A" }]}>
-                <Feather name="truck" size={20} color={Colors.primary} />
+            {[
+              { icon: "truck", value: String(driver.totalTrips), label: "رحلة مكتملة", color: Colors.primary },
+              { icon: "star", value: String(driver.rating), label: "التقييم", color: Colors.gold },
+              { icon: "zap", value: "89%", label: "معدل القبول", color: Colors.accent },
+            ].map((s, i) => (
+              <View key={i} style={styles.statCard}>
+                <View style={[styles.statIcon, { backgroundColor: s.color + "18" }]}>
+                  <Feather name={s.icon as any} size={18} color={s.color} />
+                </View>
+                <Text style={styles.statValue}>{s.value}</Text>
+                <Text style={styles.statLabel}>{s.label}</Text>
               </View>
-              <Text style={styles.statValue}>{driver.totalTrips}</Text>
-              <Text style={styles.statLabel}>رحلة مكتملة</Text>
-            </View>
-            <View style={styles.statCard}>
-              <View style={[styles.statIconWrapper, { backgroundColor: Colors.gold + "1A" }]}>
-                <Feather name="star" size={20} color={Colors.gold} />
-              </View>
-              <Text style={styles.statValue}>{driver.rating}</Text>
-              <Text style={styles.statLabel}>التقييم</Text>
-            </View>
-            <View style={styles.statCard}>
-              <View style={[styles.statIconWrapper, { backgroundColor: Colors.accent + "1A" }]}>
-                <Feather name="zap" size={20} color={Colors.accent} />
-              </View>
-              <Text style={styles.statValue}>89%</Text>
-              <Text style={styles.statLabel}>معدل القبول</Text>
-            </View>
+            ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* Incoming Order Modal */}
+      {/* ── Incoming Order Modal ── */}
       <Modal visible={showModal} transparent animationType="none">
-        <View style={styles.modalOverlay}>
-          <Animated.View
-            style={[
-              styles.modalCard,
-              {
-                transform: [
-                  {
-                    translateY: modalAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [400, 0],
-                    }),
-                  },
-                ],
-                opacity: modalAnim,
-              },
-            ]}
-          >
+        <View style={styles.overlay}>
+          <Animated.View style={[
+            styles.modalCard,
+            {
+              transform: [{
+                translateY: modalAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [500, 0],
+                }),
+              }],
+              opacity: modalAnim,
+            },
+          ]}>
+            {/* Drag handle */}
+            <View style={styles.handle} />
+
             <View style={styles.modalHeader}>
-              <View style={styles.modalPulse} />
-              <Text style={styles.modalTitle}>طلب جديد!</Text>
+              <View style={styles.newOrderBadge}>
+                <View style={styles.newOrderDot} />
+                <Text style={styles.newOrderText}>طلب جديد</Text>
+              </View>
               <Text style={styles.modalId}>#{incomingOrder?.id}</Text>
             </View>
 
-            <View style={styles.routeContainer}>
+            <View style={styles.routeCard}>
               <View style={styles.routeRow}>
-                <View style={styles.routeDot} />
-                <View style={styles.routeInfo}>
+                <View style={[styles.routeDot, { backgroundColor: Colors.primary }]} />
+                <View style={{ flex: 1, alignItems: "flex-end" }}>
                   <Text style={styles.routeType}>الاستلام من</Text>
                   <Text style={styles.routeName}>{incomingOrder?.restaurantName}</Text>
-                  <Text style={styles.routeAddress}>{incomingOrder?.restaurantAddress}</Text>
+                  <Text style={styles.routeAddr}>{incomingOrder?.restaurantAddress}</Text>
                 </View>
               </View>
-              <View style={styles.routeLine} />
+              <View style={styles.routeVLine} />
               <View style={styles.routeRow}>
                 <View style={[styles.routeDot, { backgroundColor: Colors.danger }]} />
-                <View style={styles.routeInfo}>
+                <View style={{ flex: 1, alignItems: "flex-end" }}>
                   <Text style={styles.routeType}>التوصيل إلى</Text>
-                  <Text style={styles.routeAddress}>{incomingOrder?.customerAddress}</Text>
+                  <Text style={styles.routeAddr}>{incomingOrder?.customerAddress}</Text>
                 </View>
               </View>
             </View>
 
-            <View style={styles.orderMeta}>
+            <View style={styles.metaRow}>
               <View style={styles.metaItem}>
-                <Feather name="map-pin" size={18} color={Colors.primary} />
-                <Text style={styles.metaValue}>{incomingOrder?.distance}</Text>
+                <Feather name="map-pin" size={16} color={Colors.textSecondary} />
+                <Text style={styles.metaText}>{incomingOrder?.distance}</Text>
               </View>
               <View style={styles.metaDivider} />
               <View style={styles.metaItem}>
-                <Feather name="dollar-sign" size={18} color={Colors.success} />
-                <Text style={[styles.metaValue, { color: Colors.success }]}>
+                <Feather name="dollar-sign" size={16} color={Colors.success} />
+                <Text style={[styles.metaText, { color: Colors.success }]}>
                   {incomingOrder?.fare} جنيه
                 </Text>
               </View>
             </View>
 
-            <View style={styles.modalActions}>
-              <Pressable
-                style={[styles.modalBtn, styles.declineBtn]}
-                onPress={handleDecline}
-              >
-                <Feather name="x" size={22} color={Colors.danger} />
-                <Text style={[styles.modalBtnText, { color: Colors.danger }]}>
-                  رفض
-                </Text>
+            <View style={styles.modalBtns}>
+              <Pressable style={styles.declineBtn} onPress={handleDecline}>
+                <Feather name="x" size={20} color={Colors.danger} />
+                <Text style={[styles.btnLabel, { color: Colors.danger }]}>رفض</Text>
               </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.acceptBtn]}
-                onPress={handleAccept}
-              >
-                <Feather name="check" size={22} color="#000" />
-                <Text style={[styles.modalBtnText, { color: "#000" }]}>
-                  قبول
-                </Text>
+              <Pressable style={styles.acceptBtn} onPress={handleAccept}>
+                <Feather name="check" size={20} color="#000" />
+                <Text style={[styles.btnLabel, { color: "#000" }]}>قبول</Text>
               </Pressable>
             </View>
           </Animated.View>
@@ -349,287 +384,301 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    paddingBottom: Platform.OS === "web" ? 34 : 100,
-  },
+  root: { flex: 1, backgroundColor: Colors.background },
+  scrollContent: {},
+  px: { paddingHorizontal: 20, marginBottom: 20 },
+
   header: {
     flexDirection: "row-reverse",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 8,
+    paddingVertical: 14,
+    marginBottom: 4,
   },
-  headerLeft: {
-    flex: 1,
-    alignItems: "flex-start",
-  },
-  headerCenter: {
-    flex: 3,
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
     alignItems: "center",
+    justifyContent: "center",
   },
-  headerRight: {
-    flex: 1,
-    alignItems: "flex-end",
+  headerMid: { flex: 1, alignItems: "center" },
+  driverName: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginBottom: 4,
   },
-  logoutBtn: {
+  rankPill: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  rankLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  avatarRing: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.card,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  avatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.primary + "22",
+    backgroundColor: Colors.primary + "20",
     borderWidth: 2,
     borderColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: Colors.primary,
-  },
-  driverName: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  rankBadge: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    gap: 4,
-  },
-  rankText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
+  avatarText: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.primary },
+
+  sectionLabel: {
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
     textAlign: "right",
-    marginBottom: 12,
+    marginBottom: 10,
+    letterSpacing: 0.5,
   },
+
   statusCard: {
+    flexDirection: "row-reverse",
     backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 20,
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "space-between",
+    borderRadius: 18,
     borderWidth: 1,
+    overflow: "hidden",
   },
-  statusInfo: {
+  sideAccent: { width: 4, alignSelf: "stretch" },
+  statusBody: {
     flex: 1,
-    alignItems: "flex-end",
-  },
-  statusTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    marginBottom: 6,
-  },
-  statusSubtitleRow: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 6,
+    padding: 18,
+  },
+  statusLeft: { flex: 1, alignItems: "flex-end" },
+  statusTitleRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.online,
-    shadowColor: Colors.online,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 6,
   },
-  statusSubtitle: {
-    fontSize: 13,
+  statusTitle: {
+    fontSize: 19,
+    fontFamily: "Inter_700Bold",
+  },
+  statusSub: {
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+    textAlign: "right",
   },
-  toggleBtn: {
-    width: 68,
-    height: 36,
-    borderRadius: 18,
-    marginLeft: 16,
+  gpsRow: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+  },
+  gpsText: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+  },
+  toggle: {
+    width: 60,
+    height: 32,
+    borderRadius: 16,
+    marginLeft: 14,
     justifyContent: "center",
     padding: 3,
   },
-  toggleKnob: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  knob: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     backgroundColor: Colors.textMuted,
   },
-  toggleKnobOn: {
+  knobOn: {
     backgroundColor: "#000",
     alignSelf: "flex-end",
   },
+
   walletCard: {
+    flexDirection: "row-reverse",
     backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 24,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: Colors.border,
+    overflow: "hidden",
   },
-  walletHeader: {
+  walletAccent: { width: 4 },
+  walletInner: { flex: 1, padding: 20 },
+  walletTop: {
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  walletIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   walletLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
-  balanceAmount: {
-    fontSize: 36,
+  balanceText: {
+    fontSize: 34,
     fontFamily: "Inter_700Bold",
     textAlign: "right",
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  creditBar: {
-    marginTop: 4,
+  currency: {
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
   },
-  creditBarBg: {
-    height: 8,
+  progressBg: {
+    height: 7,
     backgroundColor: Colors.card2,
     borderRadius: 4,
     overflow: "hidden",
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  creditBarFill: {
-    height: "100%",
-    borderRadius: 4,
+  progressFill: { height: "100%", borderRadius: 4 },
+  progressLabelRow: {
+    flexDirection: "row-reverse",
+    justifyContent: "space-between",
   },
-  creditText: {
-    fontSize: 12,
+  progressLabel: {
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
     color: Colors.textMuted,
-    textAlign: "left",
   },
-  warningBanner: {
+  warnBanner: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    backgroundColor: Colors.danger + "15",
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 16,
+    backgroundColor: Colors.danger + "12",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: Colors.danger + "40",
+    borderColor: Colors.danger + "30",
   },
-  warningText: {
-    fontSize: 13,
+  warnText: {
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: Colors.danger,
     flex: 1,
     textAlign: "right",
   },
+
   statsRow: {
     flexDirection: "row-reverse",
-    gap: 12,
+    gap: 10,
   },
   statCard: {
     flex: 1,
     backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 14,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  statIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  statIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   statValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginBottom: 2,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     textAlign: "center",
   },
-  modalOverlay: {
+
+  overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: "rgba(0,0,0,0.75)",
     justifyContent: "flex-end",
-    padding: 16,
-    paddingBottom: 40,
   },
   modalCard: {
     backgroundColor: Colors.card,
-    borderRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     padding: 24,
-    borderWidth: 1,
+    paddingBottom: 36,
+    borderTopWidth: 1,
     borderColor: Colors.border,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    alignSelf: "center",
+    marginBottom: 20,
   },
   modalHeader: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    marginBottom: 20,
-    gap: 10,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  modalPulse: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.success,
-    shadowColor: Colors.success,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
+  newOrderBadge: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: Colors.primary + "15",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.primary + "40",
   },
-  modalTitle: {
-    fontSize: 24,
+  newOrderDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+  },
+  newOrderText: {
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    flex: 1,
-    textAlign: "right",
+    color: Colors.primary,
   },
   modalId: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.textMuted,
   },
-  routeContainer: {
+  routeCard: {
     backgroundColor: Colors.card2,
-    borderRadius: 16,
+    borderRadius: 14,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   routeRow: {
     flexDirection: "row-reverse",
@@ -637,95 +686,95 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   routeDot: {
-    width: 12,
-    height: 12,
+    width: 11,
+    height: 11,
     borderRadius: 6,
-    backgroundColor: Colors.success,
-    marginTop: 4,
+    marginTop: 3,
   },
-  routeLine: {
+  routeVLine: {
     width: 2,
-    height: 24,
+    height: 20,
     backgroundColor: Colors.border,
-    marginRight: 5,
+    marginRight: 4.5,
     marginVertical: 4,
     alignSelf: "flex-end",
   },
-  routeInfo: {
-    flex: 1,
-    alignItems: "flex-end",
-  },
   routeType: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
     color: Colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   routeName: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     marginBottom: 2,
   },
-  routeAddress: {
-    fontSize: 13,
+  routeAddr: {
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
-  orderMeta: {
+  metaRow: {
     flexDirection: "row-reverse",
-    alignItems: "center",
     backgroundColor: Colors.card2,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 20,
+    alignItems: "center",
   },
   metaItem: {
     flex: 1,
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
   },
   metaDivider: {
     width: 1,
-    height: 32,
+    height: 28,
     backgroundColor: Colors.border,
     marginHorizontal: 8,
   },
-  metaValue: {
-    fontSize: 18,
+  metaText: {
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
-  modalActions: {
+  modalBtns: {
     flexDirection: "row-reverse",
-    gap: 12,
+    gap: 10,
   },
-  modalBtn: {
+  declineBtn: {
     flex: 1,
-    height: 58,
-    borderRadius: 14,
+    height: 54,
+    borderRadius: 13,
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-  },
-  declineBtn: {
-    backgroundColor: Colors.danger + "1A",
-    borderWidth: 2,
+    gap: 7,
+    backgroundColor: Colors.danger + "15",
+    borderWidth: 1.5,
     borderColor: Colors.danger + "40",
   },
   acceptBtn: {
+    flex: 2,
+    height: 54,
+    borderRadius: 13,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
     backgroundColor: Colors.primary,
     shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 8,
   },
-  modalBtnText: {
-    fontSize: 18,
+  btnLabel: {
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
   },
 });
