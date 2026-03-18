@@ -251,6 +251,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (phone.length >= 10 && password.length >= 4) {
       setIsAuthenticated(true);
       setDriver(MOCK_DRIVER);
+      // Auto go online after 2s, then trigger incoming order after 4s
+      setTimeout(() => {
+        setIsOnline(true);
+        setTimeout(() => {
+          setIncomingOrder(MOCK_INCOMING);
+        }, 3500);
+      }, 2000);
       return true;
     }
     return false;

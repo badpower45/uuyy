@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -28,16 +28,36 @@ const ROLES = [
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useApp();
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("01012345678");
+  const [password, setPassword] = useState("1234");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeRole, setActiveRole] = useState("driver");
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
+
+  // Auto-login on mount — show splash briefly then navigate
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
+
+    setLoading(true);
+    const timer = setTimeout(() => {
+      const success = login("01012345678", "1234");
+      if (success) {
+        router.replace("/(tabs)");
+      }
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const shake = () => {
     Animated.sequence([
@@ -68,6 +88,31 @@ export default function LoginScreen() {
       Alert.alert("بيانات غير صحيحة", "تأكد من رقم الهاتف وكلمة المرور");
     }
   };
+
+  // Show splash loading while auto-logging in
+  if (loading) {
+    return (
+      <View style={[styles.root, styles.splashCenter]}>
+        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
+        <View style={styles.glowTR} />
+        <View style={styles.glowBL} />
+        <Animated.View style={[styles.splashContent, { opacity: fadeAnim }]}>
+          <View style={styles.logoWrap}>
+            <View style={styles.logoCircle}>
+              <Feather name="truck" size={40} color="#fff" />
+            </View>
+            <View style={styles.logoPing} />
+          </View>
+          <Text style={styles.brandName}>بايلوت</Text>
+          <Text style={styles.brandTag}>منصة توصيل ذكية في الوقت الحقيقي</Text>
+          <View style={styles.loadingBar}>
+            <Animated.View style={[styles.loadingBarFill]} />
+          </View>
+          <Text style={styles.loadingLabel}>جارٍ تسجيل الدخول...</Text>
+        </Animated.View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -253,6 +298,35 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
+  },
+  splashCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  splashContent: {
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  loadingBar: {
+    width: 180,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+    marginTop: 32,
+    overflow: "hidden",
+  },
+  loadingBarFill: {
+    width: "70%",
+    height: "100%",
+    backgroundColor: Colors.primary,
+    borderRadius: 2,
+  },
+  loadingLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textMuted,
+    marginTop: 12,
+    textAlign: "center",
   },
   glowTR: {
     position: "absolute",
