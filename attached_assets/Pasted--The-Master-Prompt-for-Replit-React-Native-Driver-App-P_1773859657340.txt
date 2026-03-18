@@ -1,0 +1,44 @@
+📱 The Master Prompt for Replit (React Native - Driver App)
+
+Prompt:
+Build a complete React Native (Expo) mobile application for delivery drivers (Pilots) working in a food delivery logistics SaaS.
+
+CRITICAL REQUIREMENT: The entire user interface MUST be written in the Arabic language, and the layout MUST strictly use Right-to-Left (RTL) styling (I18nManager.forceRTL(true)). Use modern, high-contrast, large, and touch-friendly UI elements suitable for drivers on the move (motorcycles/cars).
+
+Tech Stack: React Native (Expo), React Navigation (Bottom Tabs & Native Stack), react-native-maps for tracking, and standard hooks for state management.
+
+Please generate the full boilerplate, navigation setup, and the following 4 core screens:
+
+1. Login Screen (شاشة تسجيل الدخول):
+
+Clean UI with inputs for Phone Number (رقم الهاتف) and Password (كلمة المرور).
+
+A large, prominent "Login" (تسجيل الدخول) button.
+
+2. Home & Status Screen (الرئيسية):
+
+Header: Driver Name, Avatar, and a prominent "Rank Badge" displaying their tier (e.g., الفئة الذهبية - Gold Tier).
+
+Main Action: A massive, highly visible Toggle Switch or Button for "Online / Offline" status (متاح للعمل / غير متاح).
+
+Wallet Summary Card: Displays the current balance in EGP (الرصيد الحالي), using color coding (Green for positive earnings, Red for negative/debt owed to the system).
+
+Incoming Order Modal: A mocked popup for a new order showing: Pickup location, Dropoff location, Distance, and Expected Fare, with two large buttons: "Accept" (قبول) and "Decline" (رفض).
+
+3. Active Order & Map Screen (الطلب الحالي):
+
+A MapView taking up the top 60% of the screen showing a mocked route.
+
+A bottom sheet (Swipeable) taking up the bottom 40% displaying: Order ID, Restaurant Name, Customer Name, Phone, and Cash to Collect.
+
+Dynamic Action Button: A large button at the very bottom that changes state sequentially: "In Route to Restaurant" (في الطريق للمطعم) -> "Picked Up" (تم استلام الطلب) -> "In Route to Customer" (في الطريق للعميل) -> "Delivered" (تم التسليم).
+
+4. E-Wallet & Earnings Screen (المحفظة والتقارير):
+
+Detailed breakdown of the current week's earnings and completed trips.
+
+Metrics showing "Cash Collected" vs "System Commission / Debt".
+
+A clear Warning Banner alerting the driver if they are approaching their System Credit Limit (حد الإيقاف التلقائي).
+
+Please set up the routing so the app starts at the Login screen, then navigates to a Bottom Tab Navigator containing (Home, Map, Wallet). Make the styling look professional, using a primary color of bold yellow or orange (delivery vibes) and dark mode friendly backgrounds.
