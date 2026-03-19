@@ -1,176 +1,181 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import React, { useEffect, useRef } from "react";
+import { View, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 
 interface Props {
   latitude?: number;
   longitude?: number;
+  restaurantName?: string;
+  customerName?: string;
+  restaurantLatitude?: number;
+  restaurantLongitude?: number;
+  customerLatitude?: number;
+  customerLongitude?: number;
   isTracking?: boolean;
   accuracy?: number | null;
 }
 
-export default function WebMapView({ latitude, longitude, isTracking, accuracy }: Props) {
+const CAIRO_LAT = 30.0444;
+const CAIRO_LNG = 31.2357;
+
+export default function WebMapView({
+  latitude,
+  longitude,
+  restaurantName,
+  customerName,
+  restaurantLatitude,
+  restaurantLongitude,
+  customerLatitude,
+  customerLongitude,
+}: Props) {
+  const containerRef = useRef<any>(null);
+  const mapRef = useRef<any>(null);
+  const lRef = useRef<any>(null);
+  const driverMarkerRef = useRef<any>(null);
+  const restMarkerRef = useRef<any>(null);
+  const custMarkerRef = useRef<any>(null);
+  const routeRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!containerRef.current || typeof window === "undefined") return;
+
+    // Inject Leaflet CSS from CDN
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+
+    const init = async () => {
+      if (mapRef.current) return;
+
+      const L = (await import("leaflet")).default;
+      lRef.current = L;
+
+      const lat = latitude ?? CAIRO_LAT;
+      const lng = longitude ?? CAIRO_LNG;
+
+      const map = L.map(containerRef.current, {
+        center: [lat, lng],
+        zoom: 15,
+        zoomControl: false,
+        attributionControl: false,
+      });
+
+      // CartoDB Dark Matter tiles — free, no API key
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+        { subdomains: "abcd", maxZoom: 20 }
+      ).addTo(map);
+
+      // Small attribution bottom-left
+      L.control
+        .attribution({ prefix: "© OpenStreetMap © CARTO", position: "bottomleft" })
+        .addTo(map);
+
+      const makeIcon = (emoji: string, bg: string) =>
+        L.divIcon({
+          html: `
+            <div style="
+              width:44px;height:44px;border-radius:50%;
+              background:${bg};border:3px solid #fff;
+              display:flex;align-items:center;justify-content:center;
+              box-shadow:0 0 18px ${bg}99;font-size:20px;
+              position:relative;
+            ">
+              ${emoji}
+              <div style="
+                position:absolute;bottom:-10px;left:50%;
+                transform:translateX(-50%);
+                width:0;height:0;
+                border-left:7px solid transparent;
+                border-right:7px solid transparent;
+                border-top:10px solid ${bg};
+              "></div>
+            </div>`,
+          iconSize: [44, 54],
+          iconAnchor: [22, 54],
+          popupAnchor: [0, -54],
+          className: "",
+        });
+
+      const restLat = restaurantLatitude ?? lat + 0.008;
+      const restLng = restaurantLongitude ?? lng - 0.005;
+      const custLat = customerLatitude ?? lat - 0.012;
+      const custLng = customerLongitude ?? lng + 0.009;
+
+      driverMarkerRef.current = L.marker([lat, lng], {
+        icon: makeIcon("🚗", "#22C55E"),
+      })
+        .addTo(map)
+        .bindPopup("موقعك الحالي");
+
+      restMarkerRef.current = L.marker([restLat, restLng], {
+        icon: makeIcon("🍽️", "#F59E0B"),
+      })
+        .addTo(map)
+        .bindPopup(restaurantName ?? "المطعم");
+
+      custMarkerRef.current = L.marker([custLat, custLng], {
+        icon: makeIcon("📦", "#3B82F6"),
+      })
+        .addTo(map)
+        .bindPopup(customerName ?? "العميل");
+
+      // Dashed route polyline
+      routeRef.current = L.polyline(
+        [
+          [lat, lng],
+          [restLat, restLng],
+          [custLat, custLng],
+        ],
+        { color: "#22C55E", weight: 3, opacity: 0.7, dashArray: "10 8" }
+      ).addTo(map);
+
+      mapRef.current = map;
+    };
+
+    init();
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        lRef.current = null;
+        driverMarkerRef.current = null;
+        restMarkerRef.current = null;
+        custMarkerRef.current = null;
+        routeRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update driver position when GPS changes
+  useEffect(() => {
+    if (!mapRef.current || latitude == null || longitude == null) return;
+    const pos: [number, number] = [latitude, longitude];
+    driverMarkerRef.current?.setLatLng(pos);
+
+    // Update route start point
+    if (routeRef.current && restMarkerRef.current && custMarkerRef.current) {
+      const restPos = restMarkerRef.current.getLatLng();
+      const custPos = custMarkerRef.current.getLatLng();
+      routeRef.current.setLatLngs([pos, restPos, custPos]);
+    }
+
+    mapRef.current.panTo(pos, { animate: true, duration: 1 });
+  }, [latitude, longitude]);
+
   return (
     <View style={styles.container}>
-      <View style={styles.mapBg}>
-        {/* Simulated grid lines */}
-        {[...Array(6)].map((_, i) => (
-          <View key={`h${i}`} style={[styles.gridH, { top: `${i * 20}%` as any }]} />
-        ))}
-        {[...Array(6)].map((_, i) => (
-          <View key={`v${i}`} style={[styles.gridV, { left: `${i * 20}%` as any }]} />
-        ))}
-
-        {/* Center marker */}
-        <View style={styles.markerWrap}>
-          <View style={styles.markerPing} />
-          <View style={styles.marker}>
-            <Feather name="navigation" size={18} color="#fff" />
-          </View>
-        </View>
-
-        {/* Location info overlay */}
-        {isTracking && latitude && longitude ? (
-          <View style={styles.coordBox}>
-            <View style={styles.coordRow}>
-              <View style={styles.activeDot} />
-              <Text style={styles.coordTitle}>تتبع GPS نشط</Text>
-            </View>
-            <Text style={styles.coordValue}>
-              {latitude.toFixed(5)}, {longitude.toFixed(5)}
-            </Text>
-            {accuracy !== null && accuracy !== undefined && (
-              <Text style={styles.coordAccuracy}>
-                دقة: ±{Math.round(accuracy)} متر
-              </Text>
-            )}
-          </View>
-        ) : (
-          <View style={styles.coordBox}>
-            <View style={styles.coordRow}>
-              <Feather name="map-pin" size={12} color={Colors.textMuted} />
-              <Text style={styles.coordWaiting}>في انتظار بيانات الموقع...</Text>
-            </View>
-          </View>
-        )}
-
-        <Text style={styles.mapNote}>الخريطة التفاعلية متاحة على الجهاز المحمول</Text>
-      </View>
+      <View ref={containerRef} style={styles.map} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.card,
-  },
-  mapBg: {
-    flex: 1,
-    backgroundColor: "#0F1923",
-    position: "relative",
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gridH: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  gridV: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    width: 1,
-    backgroundColor: "rgba(255,255,255,0.04)",
-  },
-  markerWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  markerPing: {
-    position: "absolute",
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.primary,
-    opacity: 0.15,
-  },
-  marker: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 3,
-    borderColor: "#fff",
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-  },
-  coordBox: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    backgroundColor: "rgba(17,24,39,0.92)",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    minWidth: 200,
-  },
-  coordRow: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 4,
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.primary,
-  },
-  coordTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.primary,
-  },
-  coordValue: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
-    textAlign: "right",
-    marginBottom: 2,
-  },
-  coordAccuracy: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
-    textAlign: "right",
-  },
-  coordWaiting: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
-  },
-  mapNote: {
-    position: "absolute",
-    bottom: 16,
-    alignSelf: "center",
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  map: { flex: 1 },
 });
