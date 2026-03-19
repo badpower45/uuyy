@@ -6,6 +6,8 @@ import {
   ScrollView,
   Pressable,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -15,7 +17,7 @@ import Colors from "@/constants/colors";
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
-  const { driver, weeklyEarnings } = useApp();
+  const { driver, weeklyEarnings, isLoadingEarnings, refreshEarnings } = useApp();
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   if (!driver) return null;
@@ -47,6 +49,14 @@ export default function WalletScreen() {
           { paddingBottom: Platform.OS === "web" ? 34 : 100 },
         ]}
         contentInsetAdjustmentBehavior="automatic"
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoadingEarnings}
+            onRefresh={refreshEarnings}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
       >
         {/* Header */}
         <View style={styles.header}>

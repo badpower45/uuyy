@@ -49,7 +49,7 @@ const STATUS_STEPS = [
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { activeOrder, advanceOrderStatus, driverLocation, isTrackingLocation } = useApp();
+  const { activeOrder, advanceOrderStatus, driverLocation, isTrackingLocation, navigateToDestination } = useApp();
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
 
@@ -65,6 +65,11 @@ export default function MapScreen() {
     if (activeOrder?.customerPhone) {
       Linking.openURL(`tel:${activeOrder.customerPhone}`);
     }
+  };
+
+  const handleNavigate = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    navigateToDestination();
   };
 
   const toggleSheet = () => {
@@ -117,6 +122,11 @@ export default function MapScreen() {
         <NativeMapView
           restaurantName={activeOrder.restaurantName}
           customerName={activeOrder.customerName}
+          restaurantLatitude={activeOrder.restaurantLatitude}
+          restaurantLongitude={activeOrder.restaurantLongitude}
+          customerLatitude={activeOrder.customerLatitude}
+          customerLongitude={activeOrder.customerLongitude}
+          orderStatus={activeOrder.status}
           latitude={driverLocation?.latitude}
           longitude={driverLocation?.longitude}
           isTracking={isTrackingLocation}
@@ -253,27 +263,49 @@ export default function MapScreen() {
           </View>
         </ScrollView>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         <View style={[styles.actionContainer, { paddingBottom: bottomPadding + 16 }]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionBtn,
-              { backgroundColor: currentStep?.color || Colors.primary },
-              pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
-            ]}
-            onPress={handleAdvance}
-          >
-            <Feather
-              name={(currentStep?.icon as any) || "check"}
-              size={24}
-              color="#000"
-            />
-            <Text style={styles.actionBtnText}>
-              {stepIndex < STATUS_STEPS.length - 1
-                ? currentStep?.nextLabel
-                : "اكتمل الطلب"}
-            </Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            {/* Navigate button — smart destination */}
+            {(activeOrder.status === "to_restaurant" || activeOrder.status === "to_customer") && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.navBtn,
+                  pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] },
+                ]}
+                onPress={handleNavigate}
+              >
+                <Feather name="navigation-2" size={22} color={Colors.primary} />
+                <Text style={styles.navBtnText}>
+                  {activeOrder.status === "to_restaurant" ? "توجه للمطعم" : "توجه للعميل"}
+                </Text>
+              </Pressable>
+            )}
+
+            {/* Main advance button */}
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionBtn,
+                (activeOrder.status === "to_restaurant" || activeOrder.status === "to_customer")
+                  ? { flex: 1 }
+                  : { flex: 1 },
+                { backgroundColor: currentStep?.color || Colors.primary },
+                pressed && { opacity: 0.88, transform: [{ scale: 0.98 }] },
+              ]}
+              onPress={handleAdvance}
+            >
+              <Feather
+                name={(currentStep?.icon as any) || "check"}
+                size={22}
+                color="#000"
+              />
+              <Text style={styles.actionBtnText}>
+                {stepIndex < STATUS_STEPS.length - 1
+                  ? currentStep?.nextLabel
+                  : "اكتمل الطلب"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </Animated.View>
     </View>
@@ -468,6 +500,28 @@ const styles = StyleSheet.create({
   actionContainer: {
     paddingTop: 16,
   },
+  actionRow: {
+    flexDirection: "row-reverse",
+    gap: 10,
+    alignItems: "stretch",
+  },
+  navBtn: {
+    width: 110,
+    height: 60,
+    borderRadius: 18,
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: Colors.primary + "1A",
+    borderWidth: 1.5,
+    borderColor: Colors.primary + "60",
+  },
+  navBtnText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.primary,
+  },
   actionBtn: {
     height: 60,
     borderRadius: 18,
@@ -482,7 +536,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   actionBtnText: {
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
     color: "#000",
   },

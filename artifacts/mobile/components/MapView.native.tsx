@@ -7,27 +7,33 @@ import MapView, {
 } from "react-native-maps";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import type { OrderStatus } from "@/context/AppContext";
 
 interface Props {
   restaurantName?: string;
   customerName?: string;
+  restaurantLatitude?: number;
+  restaurantLongitude?: number;
+  customerLatitude?: number;
+  customerLongitude?: number;
+  orderStatus?: OrderStatus;
   latitude?: number;
   longitude?: number;
   isTracking?: boolean;
   accuracy?: number | null;
 }
 
-// Cairo center as fallback
 const DEFAULT_LAT = 30.0444;
 const DEFAULT_LNG = 31.2357;
-
-// Offset helpers for demo markers around driver's location
-const RESTAURANT_OFFSET = { lat: 0.008, lng: -0.005 };
-const CUSTOMER_OFFSET = { lat: -0.012, lng: 0.009 };
 
 export default function NativeMapView({
   restaurantName = "المطعم",
   customerName = "العميل",
+  restaurantLatitude,
+  restaurantLongitude,
+  customerLatitude,
+  customerLongitude,
+  orderStatus,
   latitude,
   longitude,
   isTracking,
@@ -38,26 +44,43 @@ export default function NativeMapView({
   const driverLat = latitude ?? DEFAULT_LAT;
   const driverLng = longitude ?? DEFAULT_LNG;
 
-  const restaurantLat = driverLat + RESTAURANT_OFFSET.lat;
-  const restaurantLng = driverLng + RESTAURANT_OFFSET.lng;
+  // Use real coordinates if available, else offset from driver
+  const restLat = restaurantLatitude ?? (driverLat + 0.008);
+  const restLng = restaurantLongitude ?? (driverLng - 0.005);
+  const custLat = customerLatitude ?? (driverLat - 0.012);
+  const custLng = customerLongitude ?? (driverLng + 0.009);
 
-  const customerLat = driverLat + CUSTOMER_OFFSET.lat;
-  const customerLng = driverLng + CUSTOMER_OFFSET.lng;
+  // Determine current destination for smart camera focus
+  const isToRestaurant = orderStatus === "to_restaurant";
+  const isToCustomer = orderStatus === "to_customer";
+  const destLat = isToRestaurant ? restLat : isToCustomer ? custLat : driverLat;
+  const destLng = isToRestaurant ? restLng : isToCustomer ? custLng : driverLng;
 
-  // Animate map to driver when location updates
+  // Animate map to show both driver and current destination
   useEffect(() => {
-    if (latitude && longitude && mapRef.current) {
-      mapRef.current.animateToRegion(
-        {
-          latitude,
-          longitude,
-          latitudeDelta: 0.03,
-          longitudeDelta: 0.03,
-        },
-        800
-      );
+    if (!mapRef.current) return;
+
+    if (latitude && longitude) {
+      if (orderStatus === "to_restaurant" || orderStatus === "to_customer") {
+        // Fit both driver and destination
+        mapRef.current.fitToCoordinates(
+          [
+            { latitude: driverLat, longitude: driverLng },
+            { latitude: destLat, longitude: destLng },
+          ],
+          {
+            edgePadding: { top: 80, right: 60, bottom: 80, left: 60 },
+            animated: true,
+          }
+        );
+      } else {
+        mapRef.current.animateToRegion(
+          { latitude: driverLat, longitude: driverLng, latitudeDelta: 0.03, longitudeDelta: 0.03 },
+          800
+        );
+      }
     }
-  }, [latitude, longitude]);
+  }, [latitude, longitude, orderStatus]);
 
   return (
     <View style={styles.container}>
@@ -75,8 +98,8 @@ export default function NativeMapView({
         initialRegion={{
           latitude: driverLat,
           longitude: driverLng,
-          latitudeDelta: 0.04,
-          longitudeDelta: 0.04,
+          latitudeDelta: 0.06,
+          longitudeDelta: 0.06,
         }}
       >
         {/* Driver accuracy circle */}
@@ -103,25 +126,37 @@ export default function NativeMapView({
           </View>
         </Marker>
 
-        {/* Restaurant marker */}
+        {/* Restaurant marker — highlighted when it's the current destination */}
         <Marker
-          coordinate={{ latitude: restaurantLat, longitude: restaurantLng }}
+          coordinate={{ latitude: restLat, longitude: restLng }}
           anchor={{ x: 0.5, y: 1 }}
-          zIndex={5}
+          zIndex={isToRestaurant ? 9 : 5}
         >
-          <View style={styles.restaurantMarker}>
+          <View style={[
+            styles.restaurantMarker,
+            isToRestaurant && styles.activeMarker,
+          ]}>
             <Feather name="shopping-bag" size={14} color="#fff" />
+            {isToRestaurant && (
+              <View style={styles.pulseRing} />
+            )}
           </View>
         </Marker>
 
-        {/* Customer marker */}
+        {/* Customer marker — highlighted when it's the current destination */}
         <Marker
-          coordinate={{ latitude: customerLat, longitude: customerLng }}
+          coordinate={{ latitude: custLat, longitude: custLng }}
           anchor={{ x: 0.5, y: 1 }}
-          zIndex={5}
+          zIndex={isToCustomer ? 9 : 5}
         >
-          <View style={styles.customerMarker}>
+          <View style={[
+            styles.customerMarker,
+            isToCustomer && styles.activeMarkerCustomer,
+          ]}>
             <Feather name="home" size={14} color="#fff" />
+            {isToCustomer && (
+              <View style={[styles.pulseRing, { borderColor: Colors.accent }]} />
+            )}
           </View>
         </Marker>
       </MapView>
@@ -147,12 +182,8 @@ export default function NativeMapView({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  map: { flex: 1 },
   driverMarker: {
     width: 42,
     height: 42,
@@ -185,11 +216,44 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: Colors.danger,
+    backgroundColor: Colors.accent,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
     borderColor: "#fff",
+  },
+  activeMarker: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderColor: Colors.warning,
+    borderWidth: 3,
+    shadowColor: Colors.warning,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  activeMarkerCustomer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderColor: Colors.accent,
+    borderWidth: 3,
+    shadowColor: Colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  pulseRing: {
+    position: "absolute",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: Colors.warning,
+    opacity: 0.5,
   },
   gpsBadge: {
     position: "absolute",
@@ -205,9 +269,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.primary + "50",
   },
-  gpsBadgeWaiting: {
-    borderColor: Colors.border,
-  },
+  gpsBadgeWaiting: { borderColor: Colors.border },
   gpsDot: {
     width: 7,
     height: 7,
@@ -221,84 +283,23 @@ const styles = StyleSheet.create({
   },
 });
 
-// Dark map style for react-native-maps
 const darkMapStyle = [
   { elementType: "geometry", stylers: [{ color: "#0f1923" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#0f1923" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#d59563" }],
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#d59563" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#263c3f" }],
-  },
-  {
-    featureType: "poi.park",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#6b9a76" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#38414e" }],
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#212a37" }],
-  },
-  {
-    featureType: "road",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#9ca5b3" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#746855" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#1f2835" }],
-  },
-  {
-    featureType: "road.highway",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#f3d19c" }],
-  },
-  {
-    featureType: "transit",
-    elementType: "geometry",
-    stylers: [{ color: "#2f3948" }],
-  },
-  {
-    featureType: "transit.station",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#d59563" }],
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#17263c" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#515c6d" }],
-  },
-  {
-    featureType: "water",
-    elementType: "labels.text.stroke",
-    stylers: [{ color: "#17263c" }],
-  },
+  { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
 ];
