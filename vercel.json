@@ -1,0 +1,35 @@
+{
+  "buildCommand": "pnpm run typecheck && pnpm run build && pnpm --filter @workspace/api-server run build",
+  "startCommand": "node artifacts/api-server/dist/index.cjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "8000"
+  },
+  "envs": {
+    "preview": {
+      "env": {
+        "NODE_ENV": "staging"
+      }
+    },
+    "production": {
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  },
+  "functions": {
+    "artifacts/api-server/**": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "public": false,
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "develop": true
+    }
+  }
+}
