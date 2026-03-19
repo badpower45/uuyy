@@ -80,10 +80,12 @@ export default function MapScreen() {
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
+  // Tab bar height — must push content above the tab bar (position: absolute)
+  const TAB_BAR_HEIGHT = Platform.OS === "web" ? 84 : 49 + insets.bottom;
 
   if (!activeOrder) {
     return (
-      <View style={[styles.container, { paddingTop: topPadding }]}>
+      <View style={[styles.container, { paddingTop: topPadding, paddingBottom: TAB_BAR_HEIGHT }]}>
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
             <Feather name="map" size={48} color={Colors.textMuted} />
@@ -109,7 +111,7 @@ export default function MapScreen() {
   });
 
   return (
-    <View style={[styles.container, { paddingTop: topPadding }]}>
+    <View style={[styles.container, { paddingTop: topPadding, paddingBottom: TAB_BAR_HEIGHT }]}>
       {/* Map */}
       <View style={styles.mapContainer}>
         <NativeMapView

@@ -14,9 +14,23 @@
       "backgroundColor": "#111216"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "يحتاج التطبيق إلى موقعك لمشاركته مع العملاء أثناء التوصيل",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "يحتاج التطبيق إلى موقعك في الخلفية لتتبع رحلاتك بدقة",
+        "NSLocationAlwaysUsageDescription": "يحتاج التطبيق إلى موقعك في الخلفية لتتبع رحلاتك بدقة"
+      },
+      "backgroundModes": ["location", "fetch"]
     },
-    "android": {},
+    "android": {
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -28,7 +42,16 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "يحتاج بايلوت إلى موقعك لمشاركته أثناء التوصيل",
+          "locationAlwaysAndWhenInUsePermission": "يحتاج بايلوت إلى موقعك في الخلفية لتتبع رحلاتك",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

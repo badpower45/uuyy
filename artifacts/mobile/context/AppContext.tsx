@@ -9,6 +9,10 @@ import React, {
 } from "react";
 import * as Location from "expo-location";
 import { Platform } from "react-native";
+import {
+  BACKGROUND_LOCATION_TASK,
+  setLocationUpdateCallback,
+} from "@/tasks/locationTask";
 
 export type OrderStatus =
   | "to_restaurant"
@@ -170,6 +174,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const handleLocationUpdate = useCallback((loc: Location.LocationObject) => {
+    setDriverLocation({
+      latitude: loc.coords.latitude,
+      longitude: loc.coords.longitude,
+      accuracy: loc.coords.accuracy,
+      heading: loc.coords.heading,
+      speed: loc.coords.speed,
+      timestamp: loc.timestamp,
+    });
+    setIsTrackingLocation(true);
+  }, []);
+
   const startLocationTracking = useCallback(async () => {
     if (Platform.OS === "web") {
       if ("geolocation" in navigator) {
@@ -193,12 +209,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Ensure foreground permission
     const { status } = await Location.getForegroundPermissionsAsync();
     if (status !== "granted") {
       const granted = await requestLocationPermission();
       if (!granted) return;
     }
 
+    // Register callback for background task updates
+    setLocationUpdateCallback(handleLocationUpdate);
+
+    // Try background location (requires dev build + background permission)
+    try {
+      const TaskManager = require("expo-task-manager");
+      const bgStatus = await Location.requestBackgroundPermissionsAsync();
+      const taskRegistered = await TaskManager.isTaskRegisteredAsync(
+        BACKGROUND_LOCATION_TASK
+      );
+      if (bgStatus.status === "granted" && !taskRegistered) {
+        await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 4000,
+          distanceInterval: 10,
+          showsBackgroundLocationIndicator: true,
+          foregroundService: {
+            notificationTitle: "بايلوت — تتبع موقعك",
+            notificationBody: "موقعك يُشارك مع العملاء أثناء التوصيل",
+            notificationColor: "#22C55E",
+          },
+        });
+        setIsTrackingLocation(true);
+        return; // background task running, no need for foreground watcher
+      }
+    } catch {
+      // Background not available (Expo Go) — fall through to foreground
+    }
+
+    // Fallback: foreground watcher
     try {
       const sub = await Location.watchPositionAsync(
         {
@@ -206,32 +253,38 @@ export function AppProvider({ children }: { children: ReactNode }) {
           timeInterval: 4000,
           distanceInterval: 10,
         },
-        (loc) => {
-          setDriverLocation({
-            latitude: loc.coords.latitude,
-            longitude: loc.coords.longitude,
-            accuracy: loc.coords.accuracy,
-            heading: loc.coords.heading,
-            speed: loc.coords.speed,
-            timestamp: loc.timestamp,
-          });
-          setIsTrackingLocation(true);
-        }
+        handleLocationUpdate
       );
       locationSubscription.current = sub;
     } catch {
       setIsTrackingLocation(false);
     }
-  }, [requestLocationPermission]);
+  }, [requestLocationPermission, handleLocationUpdate]);
 
-  const stopLocationTracking = useCallback(() => {
+  const stopLocationTracking = useCallback(async () => {
     if (locationSubscription.current) {
       if ((locationSubscription.current as any).isWeb) {
-        navigator.geolocation.clearWatch((locationSubscription.current as any).watchId);
+        navigator.geolocation.clearWatch(
+          (locationSubscription.current as any).watchId
+        );
       } else {
         locationSubscription.current.remove();
       }
       locationSubscription.current = null;
+    }
+    // Stop background task if running
+    if (Platform.OS !== "web") {
+      try {
+        const TaskManager = require("expo-task-manager");
+        const taskRegistered = await TaskManager.isTaskRegisteredAsync(
+          BACKGROUND_LOCATION_TASK
+        );
+        if (taskRegistered) {
+          await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+        }
+      } catch {
+        // Ignore cleanup errors
+      }
     }
     setIsTrackingLocation(false);
   }, []);

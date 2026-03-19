@@ -17,6 +17,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
 import Colors from "@/constants/colors";
+// Register background location task before app renders
+import "@/tasks/locationTask";
 
 I18nManager.forceRTL(true);
 

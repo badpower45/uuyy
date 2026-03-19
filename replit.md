@@ -2,7 +2,36 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo using TypeScript. Contains an Express API server and a React Native (Expo) driver app called "بايلوت" (Pilot).
+
+## Main App: بايلوت Driver App (artifacts/mobile)
+
+Arabic RTL React Native Expo app for food delivery drivers.
+
+### Features
+- **Auto-login splash** → home screen in 800ms
+- **Live GPS tracking** — foreground (Expo Go) + background (dev build via expo-task-manager)
+- **Real map** — react-native-maps with dark style, driver/restaurant/customer markers
+- **4 screens**: Login splash → Home (status toggle) → Map (active order) → Wallet (earnings)
+- **Incoming order flow**: auto-triggers 4s after login
+
+### Key Files
+- `artifacts/mobile/app/index.tsx` — Auto-login splash screen
+- `artifacts/mobile/app/(tabs)/index.tsx` — Home with GPS status + online toggle
+- `artifacts/mobile/app/(tabs)/map.tsx` — Map screen, bottom bar fix (paddingBottom = TAB_BAR_HEIGHT)
+- `artifacts/mobile/app/(tabs)/wallet.tsx` — Earnings screen
+- `artifacts/mobile/context/AppContext.tsx` — State + GPS tracking (foreground + background)
+- `artifacts/mobile/tasks/locationTask.ts` — expo-task-manager background task
+- `artifacts/mobile/components/MapView.native.tsx` — Real react-native-maps (native only)
+- `artifacts/mobile/components/MapView.web.tsx` — Web placeholder with GPS coordinates display
+
+### Colors
+- Background: #0A0D11, Card: #111827, Primary (green): #22C55E
+
+### Database Migrations (for production)
+SQL files in `migrations/` folder — run in order 001→005:
+- 001: drivers, 002: orders, 003: driver_locations, 004: earnings, 005: tracking_sessions
+- Views: `driver_latest_location`, `driver_daily_earnings`
 
 ## Stack
 
