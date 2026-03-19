@@ -34,6 +34,8 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const {
     driver,
+    tenantId,
+    userRole,
     isOnline,
     toggleOnline,
     incomingOrder,
@@ -145,6 +147,10 @@ export default function HomeScreen() {
               <Text style={[styles.rankLabel, { color: rankColor }]}>
                 {RANK_LABELS[driver.rank]} • {driver.rating} ★
               </Text>
+            </View>
+            <View style={styles.workspacePill}>
+              <Feather name="briefcase" size={11} color={Colors.primary} />
+              <Text style={styles.workspaceText}>{tenantId} • {userRole}</Text>
             </View>
           </View>
           <View style={styles.avatarRing}>
@@ -422,6 +428,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   rankLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  workspacePill: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.primary + "40",
+    backgroundColor: Colors.primary + "14",
+  },
+  workspaceText: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    color: Colors.primary,
+  },
   avatarRing: {
     width: 44,
     height: 44,

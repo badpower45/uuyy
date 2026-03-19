@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -16,48 +16,30 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useApp } from "@/context/AppContext";
+import { useApp, type UserRole } from "@/context/AppContext";
 import Colors from "@/constants/colors";
 
 const ROLES = [
-  { id: "driver", label: "السائق" },
-  { id: "restaurant", label: "المطعم" },
-  { id: "admin", label: "المشرف" },
+  { id: "driver" as UserRole, label: "السائق" },
+  { id: "restaurant" as UserRole, label: "المطعم" },
+  { id: "admin" as UserRole, label: "المشرف" },
 ];
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { login } = useApp();
-  const [phone, setPhone] = useState("01012345678");
-  const [password, setPassword] = useState("1234");
+  const [tenantCode, setTenantCode] = useState("pilot-main");
+  const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeRole, setActiveRole] = useState("driver");
+  const [activeRole, setActiveRole] = useState<UserRole>("driver");
+  const [tenantFocused, setTenantFocused] = useState(false);
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const topPadding = Platform.OS === "web" ? 67 : insets.top;
-
-  // Auto-login on mount — show splash briefly then navigate
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-
-    setLoading(true);
-    const timer = setTimeout(() => {
-      const success = login("01012345678", "1234");
-      if (success) {
-        router.replace("/(tabs)");
-      }
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, []);
 
   const shake = () => {
     Animated.sequence([
@@ -70,14 +52,23 @@ export default function LoginScreen() {
   };
 
   const handleLogin = async () => {
-    if (!phone || !password) {
+    if (!tenantCode.trim() || !phone.trim() || !password.trim()) {
       shake();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("بيانات ناقصة", "أدخل كود الشركة ورقم الهاتف وكلمة المرور");
       return;
     }
+
+    if (tenantCode.trim().length < 3) {
+      shake();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("كود شركة غير صحيح", "كود الشركة لازم يكون 3 حروف أو أكثر");
+      return;
+    }
+
     setLoading(true);
     await new Promise((r) => setTimeout(r, 900));
-    const success = login(phone, password);
+    const success = login(phone.trim(), password.trim(), tenantCode.trim(), activeRole);
     setLoading(false);
     if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -88,31 +79,6 @@ export default function LoginScreen() {
       Alert.alert("بيانات غير صحيحة", "تأكد من رقم الهاتف وكلمة المرور");
     }
   };
-
-  // Show splash loading while auto-logging in
-  if (loading) {
-    return (
-      <View style={[styles.root, styles.splashCenter]}>
-        <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
-        <View style={styles.glowTR} />
-        <View style={styles.glowBL} />
-        <Animated.View style={[styles.splashContent, { opacity: fadeAnim }]}>
-          <View style={styles.logoWrap}>
-            <View style={styles.logoCircle}>
-              <Feather name="truck" size={40} color="#fff" />
-            </View>
-            <View style={styles.logoPing} />
-          </View>
-          <Text style={styles.brandName}>بايلوت</Text>
-          <Text style={styles.brandTag}>منصة توصيل ذكية في الوقت الحقيقي</Text>
-          <View style={styles.loadingBar}>
-            <Animated.View style={[styles.loadingBarFill]} />
-          </View>
-          <Text style={styles.loadingLabel}>جارٍ تسجيل الدخول...</Text>
-        </Animated.View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.root}>
@@ -156,6 +122,11 @@ export default function LoginScreen() {
             <Text style={styles.brandTag}>منصة توصيل ذكية في الوقت الحقيقي</Text>
           </View>
 
+          <View style={styles.saasBadge}>
+            <Feather name="layers" size={13} color={Colors.primary} />
+            <Text style={styles.saasBadgeText}>وضع SaaS متعدد الشركات</Text>
+          </View>
+
           {/* Login card */}
           <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
             {/* Card header */}
@@ -183,6 +154,34 @@ export default function LoginScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+
+            {/* Tenant */}
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>كود الشركة (Workspace)</Text>
+              <View style={[styles.inputRow, tenantFocused && styles.inputRowFocused]}>
+                <TextInput
+                  style={styles.textInput}
+                  value={tenantCode}
+                  onChangeText={setTenantCode}
+                  placeholder="pilot-main"
+                  placeholderTextColor={Colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textAlign="right"
+                  selectionColor={Colors.primary}
+                  editable={!loading}
+                  onFocus={() => setTenantFocused(true)}
+                  onBlur={() => setTenantFocused(false)}
+                />
+                <View style={styles.fieldIcon}>
+                  <Feather
+                    name="briefcase"
+                    size={18}
+                    color={tenantFocused ? Colors.primary : Colors.textMuted}
+                  />
+                </View>
+              </View>
             </View>
 
             {/* Phone */}
@@ -279,7 +278,7 @@ export default function LoginScreen() {
             <View style={styles.demoHint}>
               <Feather name="info" size={13} color={Colors.textMuted} />
               <Text style={styles.demoText}>
-                أي رقم هاتف (10 أرقام) + كلمة مرور (4 أحرف+)
+                نموذج تجريبي: كود شركة + رقم هاتف (10 أرقام) + كلمة مرور (4 أحرف+)
               </Text>
             </View>
           </Animated.View>
@@ -398,6 +397,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 16,
     paddingBottom: 28,
+  },
+  saasBadge: {
+    flexDirection: "row-reverse",
+    alignSelf: "center",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.primary + "18",
+    borderWidth: 1,
+    borderColor: Colors.primary + "50",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginBottom: 14,
+  },
+  saasBadgeText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.primary,
   },
   logoWrap: {
     position: "relative",

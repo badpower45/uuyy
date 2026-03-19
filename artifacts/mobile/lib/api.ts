@@ -1,6 +1,26 @@
 import { Platform } from "react-native";
 
+let tenantId = (process.env.EXPO_PUBLIC_DEFAULT_TENANT || "pilot-main").toLowerCase();
+let userRole: "driver" | "restaurant" | "admin" = "driver";
+
+export function setApiTenantContext(ctx: {
+  tenantId?: string;
+  role?: "driver" | "restaurant" | "admin";
+}) {
+  if (ctx.tenantId) {
+    tenantId = ctx.tenantId.trim().toLowerCase();
+  }
+  if (ctx.role) {
+    userRole = ctx.role;
+  }
+}
+
 function getBaseUrl(): string {
+  const explicitBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
+  if (explicitBaseUrl) {
+    return explicitBaseUrl;
+  }
+
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
   if (domain) {
     return `https://${domain}/api`;
@@ -9,14 +29,21 @@ function getBaseUrl(): string {
   if (Platform.OS === "web") {
     return "/api";
   }
-  return "http://localhost:8080/api";
+  return process.env.EXPO_PUBLIC_PROD_API_BASE_URL || "https://driver-master-api.vercel.app/api";
 }
 
 const BASE_URL = getBaseUrl();
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
+  const optionHeaders = (options?.headers ?? {}) as Record<string, string>;
+
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-tenant-id": tenantId,
+      "x-user-role": userRole,
+      ...optionHeaders,
+    },
     ...options,
   });
   if (!res.ok) {

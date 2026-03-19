@@ -13,7 +13,13 @@ import {
   BACKGROUND_LOCATION_TASK,
   setLocationUpdateCallback,
 } from "@/tasks/locationTask";
-import { apiClient, type ApiDriver, type ApiWeeklyEarning, type ApiOrderRoute } from "@/lib/api";
+import {
+  apiClient,
+  setApiTenantContext,
+  type ApiDriver,
+  type ApiWeeklyEarning,
+  type ApiOrderRoute,
+} from "@/lib/api";
 
 export type OrderStatus =
   | "to_restaurant"
@@ -22,6 +28,7 @@ export type OrderStatus =
   | "delivered";
 
 export type RankTier = "bronze" | "silver" | "gold" | "platinum";
+export type UserRole = "driver" | "restaurant" | "admin";
 
 export interface DriverLocation {
   latitude: number;
@@ -84,6 +91,8 @@ export interface Driver {
 
 interface AppContextType {
   isAuthenticated: boolean;
+  tenantId: string;
+  userRole: UserRole;
   driver: Driver | null;
   isOnline: boolean;
   activeOrder: Order | null;
@@ -96,7 +105,7 @@ interface AppContextType {
   routePolyline: [number, number][] | null;
   routeEta: string | null;
   routeSteps: Array<{ instruction: string; distanceM: number; durationSec: number }>;
-  login: (phone: string, password: string) => boolean;
+  login: (phone: string, password: string, tenantId?: string, role?: UserRole) => boolean;
   logout: () => void;
   toggleOnline: () => void;
   acceptOrder: () => void;
@@ -125,6 +134,8 @@ const MOCK_INCOMING: IncomingOrder = {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [tenantId, setTenantId] = useState("pilot-main");
+  const [userRole, setUserRole] = useState<UserRole>("driver");
   const [driver, setDriver] = useState<Driver | null>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
@@ -485,8 +496,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [activeOrder, driverLocation]);
 
-  const login = useCallback((phone: string, password: string): boolean => {
-    if (phone.length >= 10 && password.length >= 4) {
+  const login = useCallback((phone: string, password: string, tenant?: string, role: UserRole = "driver"): boolean => {
+    const normalizedTenant = tenant?.trim().toLowerCase() || "pilot-main";
+
+    if (phone.length >= 10 && password.length >= 4 && normalizedTenant.length >= 3) {
+      setTenantId(normalizedTenant);
+      setUserRole(role);
+      setApiTenantContext({ tenantId: normalizedTenant, role });
       setIsAuthenticated(true);
       fetchDriver(phone).then((d) => {
         if (d) {
@@ -506,6 +522,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stopLocationTracking();
     stopIncomingPoll();
     setIsAuthenticated(false);
+    setTenantId("pilot-main");
+    setUserRole("driver");
+    setApiTenantContext({ tenantId: "pilot-main", role: "driver" });
     setDriver(null);
     setIsOnline(false);
     setActiveOrder(null);
@@ -642,6 +661,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: AppContextType = {
     isAuthenticated,
+    tenantId,
+    userRole,
     driver,
     isOnline,
     activeOrder,
