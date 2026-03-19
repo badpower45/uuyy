@@ -1,37 +1,32 @@
 import { BlurView } from "expo-blur";
-import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-
-function NativeTabLayout() {
-  return (
-    <NativeTabs>
-      <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>الرئيسية</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="map">
-        <Icon sf={{ default: "map", selected: "map.fill" }} />
-        <Label>الطلب</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="wallet">
-        <Icon sf={{ default: "wallet.pass", selected: "wallet.pass.fill" }} />
-        <Label>المحفظة</Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
-  );
-}
+import { useApp } from "@/context/AppContext";
 
 function ClassicTabLayout() {
   const safeAreaInsets = useSafeAreaInsets();
+  const { userRole } = useApp();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+
+  const firstTab =
+    userRole === "admin"
+      ? { name: "super-admin", title: "السوبر أدمن", sf: "person.3.fill", icon: "shield" as const }
+      : userRole === "restaurant"
+        ? { name: "restaurant", title: "المطعم", sf: "building.2.fill", icon: "shopping-bag" as const }
+        : { name: "index", title: "الرئيسية", sf: "house", icon: "home" as const };
+
+  const secondTab =
+    userRole === "restaurant"
+      ? { title: "الخريطة", sf: "map.fill", icon: "map" as const }
+      : userRole === "admin"
+        ? { title: "المتابعة", sf: "map.fill", icon: "map" as const }
+        : { title: "الطلب", sf: "map", icon: "map" as const };
 
   return (
     <Tabs
@@ -67,26 +62,26 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name={firstTab.name}
         options={{
-          title: "الرئيسية",
+          title: firstTab.title,
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="house" tintColor={color} size={24} />
+              <SymbolView name={firstTab.sf as any} tintColor={color} size={24} />
             ) : (
-              <Feather name="home" size={22} color={color} />
+              <Feather name={firstTab.icon} size={22} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
-          title: "الطلب",
+          title: secondTab.title,
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name="map" tintColor={color} size={24} />
+              <SymbolView name={secondTab.sf as any} tintColor={color} size={24} />
             ) : (
-              <Feather name="map" size={22} color={color} />
+              <Feather name={secondTab.icon} size={22} color={color} />
             ),
         }}
       />
@@ -102,13 +97,19 @@ function ClassicTabLayout() {
             ),
         }}
       />
+
+      {/* Hidden routes (for role switching without remount issues) */}
+      {firstTab.name !== "index" && <Tabs.Screen name="index" options={{ href: null }} />}
+      {firstTab.name !== "super-admin" && (
+        <Tabs.Screen name="super-admin" options={{ href: null }} />
+      )}
+      {firstTab.name !== "restaurant" && (
+        <Tabs.Screen name="restaurant" options={{ href: null }} />
+      )}
     </Tabs>
   );
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
   return <ClassicTabLayout />;
 }

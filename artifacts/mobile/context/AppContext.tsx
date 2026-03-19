@@ -108,8 +108,12 @@ interface AppContextType {
   login: (phone: string, password: string, tenantId?: string, role?: UserRole) => boolean;
   logout: () => void;
   toggleOnline: () => void;
+  adminSetOnline: (next: boolean) => void;
+  adminUpdateDriver: (patch: Partial<Driver>) => void;
+  adminCreateIncomingOrder: (payload: Partial<IncomingOrder>) => void;
   acceptOrder: () => void;
   declineOrder: () => void;
+  restaurantMarkOrderReady: () => void;
   advanceOrderStatus: () => void;
   requestLocationPermission: () => Promise<boolean>;
   navigateToDestination: () => void;
@@ -117,20 +121,6 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-// Cairo area coordinates for demo
-const MOCK_INCOMING: IncomingOrder = {
-  id: "ORD-8821",
-  restaurantName: "مطعم الأصالة",
-  restaurantAddress: "شارع التحرير، الدقي",
-  restaurantLatitude: 30.0626,
-  restaurantLongitude: 31.1992,
-  customerAddress: "مدينة نصر، شارع عباس العقاد",
-  customerLatitude: 30.0754,
-  customerLongitude: 31.3366,
-  distance: "4.2 كم",
-  fare: 55,
-};
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -168,17 +158,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }))
       );
     } catch (err) {
-      console.warn("Failed to fetch earnings, using fallback:", err);
-      // Fallback mock data
-      setWeeklyEarnings([
-        { date: "السبت", trips: 8, earnings: 320, cashCollected: 580, commission: 80 },
-        { date: "الأحد", trips: 12, earnings: 480, cashCollected: 890, commission: 120 },
-        { date: "الاثنين", trips: 6, earnings: 240, cashCollected: 410, commission: 60 },
-        { date: "الثلاثاء", trips: 15, earnings: 600, cashCollected: 1100, commission: 150 },
-        { date: "الأربعاء", trips: 10, earnings: 400, cashCollected: 720, commission: 100 },
-        { date: "الخميس", trips: 9, earnings: 360, cashCollected: 640, commission: 90 },
-        { date: "الجمعة", trips: 11, earnings: 440, cashCollected: 800, commission: 110 },
-      ]);
+      console.warn("Failed to fetch earnings:", err);
+      setWeeklyEarnings([]);
     } finally {
       setIsLoadingEarnings(false);
     }
@@ -200,18 +181,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         rating: data.rating,
       };
     } catch (err) {
-      console.warn("Driver API unavailable, using mock:", err);
-      return {
-        id: 1,
-        name: "محمد أحمد",
-        phone,
-        avatar: "م",
-        rank: "gold",
-        balance: -85.5,
-        creditLimit: 500,
-        totalTrips: 247,
-        rating: 4.8,
-      };
+      console.warn("Driver API unavailable:", err);
+      return null;
     }
   }, []);
 
@@ -507,16 +478,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       fetchDriver(phone).then((d) => {
         if (d) {
           setDriver(d);
-          setTimeout(() => {
-            setIsOnline(true);
-            startIncomingPoll(d.id);
-          }, 2000);
+          if (role === "driver") {
+            setTimeout(() => {
+              setIsOnline(true);
+              startIncomingPoll(d.id);
+            }, 1200);
+          } else {
+            setIsOnline(false);
+            stopIncomingPoll();
+          }
         }
       });
       return true;
     }
     return false;
-  }, [fetchDriver, startIncomingPoll]);
+  }, [fetchDriver, startIncomingPoll, stopIncomingPoll]);
 
   const logout = useCallback(() => {
     stopLocationTracking();
@@ -549,6 +525,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return next;
     });
   }, [activeOrder, driver, startIncomingPoll, stopIncomingPoll]);
+
+  const adminSetOnline = useCallback((next: boolean) => {
+    setIsOnline(next);
+    if (next && !activeOrder && driver) {
+      startIncomingPoll(driver.id);
+    }
+    if (!next) {
+      stopIncomingPoll();
+      setIncomingOrder(null);
+    }
+  }, [activeOrder, driver, startIncomingPoll, stopIncomingPoll]);
+
+  const adminUpdateDriver = useCallback((patch: Partial<Driver>) => {
+    setDriver((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
+  const adminCreateIncomingOrder = useCallback((payload: Partial<IncomingOrder>) => {
+    const fallbackLat = driverLocation?.latitude ?? 30.0444;
+    const fallbackLng = driverLocation?.longitude ?? 31.2357;
+
+    const next: IncomingOrder = {
+      id: payload.id || `ORD-${Math.floor(1000 + Math.random() * 9000)}`,
+      restaurantName: payload.restaurantName || "مطعم جديد",
+      restaurantAddress: payload.restaurantAddress || "عنوان المطعم",
+      restaurantLatitude: payload.restaurantLatitude ?? fallbackLat + 0.01,
+      restaurantLongitude: payload.restaurantLongitude ?? fallbackLng - 0.01,
+      customerAddress: payload.customerAddress || "عنوان العميل",
+      customerLatitude: payload.customerLatitude ?? fallbackLat + 0.02,
+      customerLongitude: payload.customerLongitude ?? fallbackLng + 0.01,
+      distance: payload.distance || "—",
+      fare: payload.fare ?? 0,
+    };
+
+    setIncomingOrder(next);
+  }, [driverLocation]);
 
   const acceptOrder = useCallback(() => {
     if (!incomingOrder || !driver) return;
@@ -583,25 +594,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       })
       .catch((err) => {
         console.warn("Accept order failed:", err);
-        // Fallback: accept locally
-        const order: Order = {
-          id: incomingOrder.id,
-          restaurantName: incomingOrder.restaurantName,
-          restaurantAddress: incomingOrder.restaurantAddress,
-          restaurantLatitude: incomingOrder.restaurantLatitude,
-          restaurantLongitude: incomingOrder.restaurantLongitude,
-          customerName: "عميل",
-          customerPhone: "01000000000",
-          customerAddress: incomingOrder.customerAddress,
-          customerLatitude: incomingOrder.customerLatitude,
-          customerLongitude: incomingOrder.customerLongitude,
-          distance: incomingOrder.distance,
-          fare: incomingOrder.fare,
-          cashToCollect: incomingOrder.fare,
-          status: "to_restaurant",
-        };
-        setActiveOrder(order);
-        setIncomingOrder(null);
       });
   }, [incomingOrder, driver, driverLocation, fetchRoute, stopIncomingPoll]);
 
@@ -615,6 +607,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTimeout(() => startIncomingPoll(driver.id), 10000);
     }
   }, [incomingOrder, driver, startIncomingPoll]);
+
+  const restaurantMarkOrderReady = useCallback(() => {
+    if (!activeOrder) return;
+    if (activeOrder.status !== "to_restaurant") return;
+
+    const orderId = parseInt(activeOrder.id);
+    setActiveOrder({ ...activeOrder, status: "picked_up" });
+    apiClient.advanceOrderStatus(orderId, "picked_up").catch(console.warn);
+  }, [activeOrder]);
 
   const advanceOrderStatus = useCallback(() => {
     if (!activeOrder) return;
@@ -678,8 +679,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     toggleOnline,
+    adminSetOnline,
+    adminUpdateDriver,
+    adminCreateIncomingOrder,
     acceptOrder,
     declineOrder,
+    restaurantMarkOrderReady,
     advanceOrderStatus,
     requestLocationPermission,
     navigateToDestination,
