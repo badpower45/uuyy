@@ -13,7 +13,7 @@ import {
   BACKGROUND_LOCATION_TASK,
   setLocationUpdateCallback,
 } from "@/tasks/locationTask";
-import { apiClient, type ApiDriver, type ApiWeeklyEarning } from "@/lib/api";
+import { apiClient, type ApiDriver, type ApiWeeklyEarning, type ApiOrderRoute } from "@/lib/api";
 
 export type OrderStatus =
   | "to_restaurant"
@@ -93,6 +93,9 @@ interface AppContextType {
   locationPermission: "granted" | "denied" | "undetermined";
   isTrackingLocation: boolean;
   isLoadingEarnings: boolean;
+  routePolyline: [number, number][] | null;
+  routeEta: string | null;
+  routeSteps: Array<{ instruction: string; distanceM: number; durationSec: number }>;
   login: (phone: string, password: string) => boolean;
   logout: () => void;
   toggleOnline: () => void;
@@ -131,8 +134,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [driverLocation, setDriverLocation] = useState<DriverLocation | null>(null);
   const [locationPermission, setLocationPermission] = useState<"granted" | "denied" | "undetermined">("undetermined");
   const [isTrackingLocation, setIsTrackingLocation] = useState(false);
+  const [routePolyline, setRoutePolyline] = useState<[number, number][] | null>(null);
+  const [routeEta, setRouteEta] = useState<string | null>(null);
+  const [routeSteps, setRouteSteps] = useState<Array<{ instruction: string; distanceM: number; durationSec: number }>>([]);
 
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
+  const incomingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch weekly earnings from real API
   const refreshEarnings = useCallback(async () => {
@@ -204,6 +211,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [driver?.id]);
 
+  // Fetch and store the OSRM route for the active order
+  const fetchRoute = useCallback(async (orderId: number, driverLat: number, driverLng: number) => {
+    try {
+      const data: ApiOrderRoute = await apiClient.getOrderRoute({ driverLat, driverLng, orderId });
+      if (data.route?.polyline?.length) {
+        setRoutePolyline(data.route.polyline);
+        const mins = Math.round(data.route.totalDurationMinutes);
+        setRouteEta(`${mins} دقيقة`);
+        const allSteps = data.route.legs.flatMap((leg) => leg.steps);
+        setRouteSteps(allSteps);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch route:", err);
+    }
+  }, []);
+
+  // Poll for incoming orders every 8 seconds when online and no active order
+  const startIncomingPoll = useCallback((drivId: number) => {
+    if (incomingPollRef.current) clearInterval(incomingPollRef.current);
+    const poll = async () => {
+      try {
+        const order = await apiClient.getIncomingOrder();
+        if (order) {
+          setIncomingOrder({
+            id: String(order.id),
+            restaurantName: order.restaurantName,
+            restaurantAddress: order.restaurantAddress,
+            restaurantLatitude: order.restaurantLatitude ?? 30.0626,
+            restaurantLongitude: order.restaurantLongitude ?? 31.1992,
+            customerAddress: order.customerAddress,
+            customerLatitude: order.customerLatitude ?? 30.0754,
+            customerLongitude: order.customerLongitude ?? 31.3366,
+            distance: order.distanceKm ? `${order.distanceKm} كم` : "—",
+            fare: order.fare,
+          });
+          if (incomingPollRef.current) clearInterval(incomingPollRef.current);
+        }
+      } catch (err) {
+        console.warn("Incoming order poll error:", err);
+      }
+    };
+    poll();
+    incomingPollRef.current = setInterval(poll, 8000);
+  }, []);
+
+  const stopIncomingPoll = useCallback(() => {
+    if (incomingPollRef.current) {
+      clearInterval(incomingPollRef.current);
+      incomingPollRef.current = null;
+    }
+  }, []);
+
   const requestLocationPermission = useCallback(async (): Promise<boolean> => {
     if (Platform.OS === "web") {
       return new Promise((resolve) => {
@@ -243,16 +302,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const lastSavedLocationRef = useRef<number>(0);
+
   const handleLocationUpdate = useCallback((loc: Location.LocationObject) => {
-    setDriverLocation({
+    const newLoc = {
       latitude: loc.coords.latitude,
       longitude: loc.coords.longitude,
       accuracy: loc.coords.accuracy,
       heading: loc.coords.heading,
       speed: loc.coords.speed,
       timestamp: loc.timestamp,
-    });
+    };
+    setDriverLocation(newLoc);
     setIsTrackingLocation(true);
+
+    // Save GPS ping to backend every 5 seconds
+    const now = Date.now();
+    if (now - lastSavedLocationRef.current > 5000) {
+      lastSavedLocationRef.current = now;
+      // Use functional form of setState to get latest driver + activeOrder
+      setDriver((currentDriver) => {
+        if (currentDriver) {
+          setActiveOrder((currentOrder) => {
+            apiClient.saveLocation(currentDriver.id, {
+              latitude: newLoc.latitude,
+              longitude: newLoc.longitude,
+              accuracy: newLoc.accuracy,
+              heading: newLoc.heading,
+              speed: newLoc.speed,
+              orderId: currentOrder ? parseInt(currentOrder.id) : null,
+            }).catch(() => {});
+            return currentOrder;
+          });
+        }
+        return currentDriver;
+      });
+    }
   }, []);
 
   const startLocationTracking = useCallback(async () => {
@@ -404,21 +489,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (phone.length >= 10 && password.length >= 4) {
       setIsAuthenticated(true);
       fetchDriver(phone).then((d) => {
-        if (d) setDriver(d);
+        if (d) {
+          setDriver(d);
+          setTimeout(() => {
+            setIsOnline(true);
+            startIncomingPoll(d.id);
+          }, 2000);
+        }
       });
-      setTimeout(() => {
-        setIsOnline(true);
-        setTimeout(() => {
-          setIncomingOrder(MOCK_INCOMING);
-        }, 3500);
-      }, 2000);
       return true;
     }
     return false;
-  }, [fetchDriver]);
+  }, [fetchDriver, startIncomingPoll]);
 
   const logout = useCallback(() => {
     stopLocationTracking();
+    stopIncomingPoll();
     setIsAuthenticated(false);
     setDriver(null);
     setIsOnline(false);
@@ -426,74 +512,133 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIncomingOrder(null);
     setDriverLocation(null);
     setWeeklyEarnings([]);
-  }, [stopLocationTracking]);
+    setRoutePolyline(null);
+    setRouteEta(null);
+    setRouteSteps([]);
+  }, [stopLocationTracking, stopIncomingPoll]);
 
   const toggleOnline = useCallback(() => {
     setIsOnline((prev) => {
       const next = !prev;
-      if (next && !activeOrder) {
-        setTimeout(() => {
-          setIncomingOrder(MOCK_INCOMING);
-        }, 4000);
+      if (next && !activeOrder && driver) {
+        startIncomingPoll(driver.id);
       }
       if (!next) {
+        stopIncomingPoll();
         setIncomingOrder(null);
       }
       return next;
     });
-  }, [activeOrder]);
+  }, [activeOrder, driver, startIncomingPoll, stopIncomingPoll]);
 
   const acceptOrder = useCallback(() => {
-    if (!incomingOrder) return;
-    const order: Order = {
-      id: incomingOrder.id,
-      restaurantName: incomingOrder.restaurantName,
-      restaurantAddress: incomingOrder.restaurantAddress,
-      restaurantLatitude: incomingOrder.restaurantLatitude,
-      restaurantLongitude: incomingOrder.restaurantLongitude,
-      customerName: "سارة محمود",
-      customerPhone: "01098765432",
-      customerAddress: incomingOrder.customerAddress,
-      customerLatitude: incomingOrder.customerLatitude,
-      customerLongitude: incomingOrder.customerLongitude,
-      distance: incomingOrder.distance,
-      fare: incomingOrder.fare,
-      cashToCollect: incomingOrder.fare + 15,
-      status: "to_restaurant",
-    };
-    setActiveOrder(order);
-    setIncomingOrder(null);
-  }, [incomingOrder]);
+    if (!incomingOrder || !driver) return;
+    const orderId = parseInt(incomingOrder.id);
+
+    apiClient.acceptOrder(orderId, driver.id)
+      .then((apiOrder) => {
+        const order: Order = {
+          id: String(apiOrder.id),
+          restaurantName: apiOrder.restaurantName,
+          restaurantAddress: apiOrder.restaurantAddress,
+          restaurantLatitude: apiOrder.restaurantLatitude ?? incomingOrder.restaurantLatitude,
+          restaurantLongitude: apiOrder.restaurantLongitude ?? incomingOrder.restaurantLongitude,
+          customerName: apiOrder.customerName,
+          customerPhone: apiOrder.customerPhone,
+          customerAddress: apiOrder.customerAddress,
+          customerLatitude: apiOrder.customerLatitude ?? incomingOrder.customerLatitude,
+          customerLongitude: apiOrder.customerLongitude ?? incomingOrder.customerLongitude,
+          distance: apiOrder.distanceKm ? `${apiOrder.distanceKm} كم` : incomingOrder.distance,
+          fare: apiOrder.fare,
+          cashToCollect: apiOrder.cashToCollect,
+          status: "to_restaurant",
+        };
+        setActiveOrder(order);
+        setIncomingOrder(null);
+        stopIncomingPoll();
+
+        // Fetch real OSRM route immediately
+        const dLat = driverLocation?.latitude ?? order.restaurantLatitude;
+        const dLng = driverLocation?.longitude ?? order.restaurantLongitude;
+        fetchRoute(apiOrder.id, dLat, dLng);
+      })
+      .catch((err) => {
+        console.warn("Accept order failed:", err);
+        // Fallback: accept locally
+        const order: Order = {
+          id: incomingOrder.id,
+          restaurantName: incomingOrder.restaurantName,
+          restaurantAddress: incomingOrder.restaurantAddress,
+          restaurantLatitude: incomingOrder.restaurantLatitude,
+          restaurantLongitude: incomingOrder.restaurantLongitude,
+          customerName: "عميل",
+          customerPhone: "01000000000",
+          customerAddress: incomingOrder.customerAddress,
+          customerLatitude: incomingOrder.customerLatitude,
+          customerLongitude: incomingOrder.customerLongitude,
+          distance: incomingOrder.distance,
+          fare: incomingOrder.fare,
+          cashToCollect: incomingOrder.fare,
+          status: "to_restaurant",
+        };
+        setActiveOrder(order);
+        setIncomingOrder(null);
+      });
+  }, [incomingOrder, driver, driverLocation, fetchRoute, stopIncomingPoll]);
 
   const declineOrder = useCallback(() => {
+    if (incomingOrder) {
+      apiClient.declineOrder(parseInt(incomingOrder.id)).catch(console.warn);
+    }
     setIncomingOrder(null);
-  }, []);
+    // Resume polling after 10 seconds
+    if (driver) {
+      setTimeout(() => startIncomingPoll(driver.id), 10000);
+    }
+  }, [incomingOrder, driver, startIncomingPoll]);
 
   const advanceOrderStatus = useCallback(() => {
     if (!activeOrder) return;
     const statusFlow: OrderStatus[] = ["to_restaurant", "picked_up", "to_customer", "delivered"];
     const currentIndex = statusFlow.indexOf(activeOrder.status);
     if (currentIndex < statusFlow.length - 1) {
-      setActiveOrder({ ...activeOrder, status: statusFlow[currentIndex + 1] });
+      const nextStatus = statusFlow[currentIndex + 1];
+      setActiveOrder({ ...activeOrder, status: nextStatus });
+
+      const orderId = parseInt(activeOrder.id);
+      apiClient.advanceOrderStatus(orderId, nextStatus).catch(console.warn);
+
+      // Re-fetch route if moving to next navigation leg
+      if (nextStatus === "to_customer" && driverLocation) {
+        fetchRoute(orderId, driverLocation.latitude, driverLocation.longitude);
+      } else if (nextStatus === "picked_up") {
+        setRoutePolyline(null);
+        setRouteEta(null);
+      }
     } else {
-      // Order delivered — record earning
+      const orderId = parseInt(activeOrder.id);
+      // Order delivered
+      apiClient.advanceOrderStatus(orderId, "delivered").catch(console.warn);
       if (driver) {
         const commission = activeOrder.fare * 0.25;
         apiClient.recordEarning(driver.id, {
           amount: activeOrder.fare,
           cashCollected: activeOrder.cashToCollect,
           commission,
+          orderId,
         }).catch(console.warn);
       }
       setActiveOrder(null);
+      setRoutePolyline(null);
+      setRouteEta(null);
+      setRouteSteps([]);
       setDriver((prev) => prev ? { ...prev, totalTrips: prev.totalTrips + 1 } : prev);
-      // Refresh earnings after delivery
       setTimeout(() => refreshEarnings(), 1000);
-      if (isOnline) {
-        setTimeout(() => { setIncomingOrder(MOCK_INCOMING); }, 5000);
+      if (isOnline && driver) {
+        setTimeout(() => startIncomingPoll(driver.id), 5000);
       }
     }
-  }, [activeOrder, isOnline, driver, refreshEarnings]);
+  }, [activeOrder, isOnline, driver, driverLocation, fetchRoute, refreshEarnings, startIncomingPoll]);
 
   const value: AppContextType = {
     isAuthenticated,
@@ -506,6 +651,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     locationPermission,
     isTrackingLocation,
     isLoadingEarnings,
+    routePolyline,
+    routeEta,
+    routeSteps,
     login,
     logout,
     toggleOnline,

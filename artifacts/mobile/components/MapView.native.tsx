@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from "react-native";
 import MapView, {
   Marker,
   Circle,
+  Polyline,
   PROVIDER_DEFAULT,
 } from "react-native-maps";
 import { Feather } from "@expo/vector-icons";
@@ -21,6 +22,7 @@ interface Props {
   longitude?: number;
   isTracking?: boolean;
   accuracy?: number | null;
+  routePolyline?: [number, number][] | null;
 }
 
 const DEFAULT_LAT = 30.0444;
@@ -38,6 +40,7 @@ export default function NativeMapView({
   longitude,
   isTracking,
   accuracy,
+  routePolyline,
 }: Props) {
   const mapRef = useRef<MapView>(null);
 
@@ -159,6 +162,34 @@ export default function NativeMapView({
             )}
           </View>
         </Marker>
+
+        {/* Real OSRM route polyline — OSRM returns [lng, lat], native maps need {latitude, longitude} */}
+        {routePolyline && routePolyline.length > 1 && (() => {
+          const routeColor = orderStatus === "to_restaurant" ? Colors.warning : Colors.primary;
+          const coords = routePolyline.map(([lng2, lat2]) => ({ latitude: lat2, longitude: lng2 }));
+          return (
+            <>
+              {/* Glow layer */}
+              <Polyline
+                coordinates={coords}
+                strokeColor={routeColor + "33"}
+                strokeWidth={14}
+                lineCap="round"
+                lineJoin="round"
+                zIndex={1}
+              />
+              {/* Main route line */}
+              <Polyline
+                coordinates={coords}
+                strokeColor={routeColor}
+                strokeWidth={4}
+                lineCap="round"
+                lineJoin="round"
+                zIndex={2}
+              />
+            </>
+          );
+        })()}
       </MapView>
 
       {/* GPS status badge */}

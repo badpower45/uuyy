@@ -13,6 +13,8 @@ interface Props {
   customerLongitude?: number;
   isTracking?: boolean;
   accuracy?: number | null;
+  orderStatus?: string;
+  routePolyline?: [number, number][] | null;
 }
 
 const CAIRO_LAT = 30.0444;
@@ -27,6 +29,8 @@ export default function WebMapView({
   restaurantLongitude,
   customerLatitude,
   customerLongitude,
+  orderStatus,
+  routePolyline,
 }: Props) {
   const containerRef = useRef<any>(null);
   const mapRef = useRef<any>(null);
@@ -35,6 +39,7 @@ export default function WebMapView({
   const restMarkerRef = useRef<any>(null);
   const custMarkerRef = useRef<any>(null);
   const routeRef = useRef<any>(null);
+  const routeGlowRef = useRef<any>(null);
 
   useEffect(() => {
     if (!containerRef.current || typeof window === "undefined") return;
@@ -135,6 +140,15 @@ export default function WebMapView({
       ).addTo(map);
 
       mapRef.current = map;
+
+      // Fit map to all markers on init
+      const L2 = L;
+      const bounds = L2.latLngBounds([
+        [lat, lng],
+        [restLat, restLng],
+        [custLat, custLng],
+      ]);
+      map.fitBounds(bounds, { padding: [60, 60] });
     };
 
     init();
@@ -148,25 +162,60 @@ export default function WebMapView({
         restMarkerRef.current = null;
         custMarkerRef.current = null;
         routeRef.current = null;
+        routeGlowRef.current = null;
       }
     };
   }, []);
 
-  // Update driver position when GPS changes
+  // Draw real OSRM polyline when route data changes
+  useEffect(() => {
+    if (!mapRef.current || !lRef.current || !routePolyline?.length) return;
+    const L = lRef.current;
+    const map = mapRef.current;
+
+    // Remove old layers
+    if (routeGlowRef.current) { map.removeLayer(routeGlowRef.current); routeGlowRef.current = null; }
+    if (routeRef.current) { map.removeLayer(routeRef.current); routeRef.current = null; }
+
+    // OSRM returns [lng, lat] — flip to [lat, lng] for Leaflet
+    const latLngs: [number, number][] = routePolyline.map(([lng2, lat2]) => [lat2, lng2]);
+
+    const routeColor = orderStatus === "to_restaurant" ? "#F59E0B" : "#22C55E";
+
+    // Glow effect (wide, soft)
+    routeGlowRef.current = L.polyline(latLngs, {
+      color: routeColor,
+      weight: 14,
+      opacity: 0.15,
+      lineCap: "round",
+      lineJoin: "round",
+    }).addTo(map);
+
+    // Main line
+    routeRef.current = L.polyline(latLngs, {
+      color: routeColor,
+      weight: 4.5,
+      opacity: 0.92,
+      lineCap: "round",
+      lineJoin: "round",
+    }).addTo(map);
+
+    // Fit to route with padding
+    const bounds = L.latLngBounds(latLngs);
+    map.fitBounds(bounds, { padding: [80, 80], animate: true });
+  }, [routePolyline, orderStatus]);
+
+  // Update driver marker when GPS changes
   useEffect(() => {
     if (!mapRef.current || latitude == null || longitude == null) return;
     const pos: [number, number] = [latitude, longitude];
     driverMarkerRef.current?.setLatLng(pos);
 
-    // Update route start point
-    if (routeRef.current && restMarkerRef.current && custMarkerRef.current) {
-      const restPos = restMarkerRef.current.getLatLng();
-      const custPos = custMarkerRef.current.getLatLng();
-      routeRef.current.setLatLngs([pos, restPos, custPos]);
+    // Only pan if no real route is displayed
+    if (!routePolyline?.length) {
+      mapRef.current.panTo(pos, { animate: true, duration: 0.8 });
     }
-
-    mapRef.current.panTo(pos, { animate: true, duration: 1 });
-  }, [latitude, longitude]);
+  }, [latitude, longitude, routePolyline]);
 
   return (
     <View style={styles.container}>

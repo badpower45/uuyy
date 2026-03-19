@@ -49,7 +49,7 @@ const STATUS_STEPS = [
 
 export default function MapScreen() {
   const insets = useSafeAreaInsets();
-  const { activeOrder, advanceOrderStatus, driverLocation, isTrackingLocation, navigateToDestination } = useApp();
+  const { activeOrder, advanceOrderStatus, driverLocation, isTrackingLocation, navigateToDestination, routePolyline, routeEta, routeSteps } = useApp();
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const sheetAnim = useRef(new Animated.Value(0)).current;
 
@@ -131,6 +131,7 @@ export default function MapScreen() {
           longitude={driverLocation?.longitude}
           isTracking={isTrackingLocation}
           accuracy={driverLocation?.accuracy}
+          routePolyline={routePolyline}
         />
 
         {/* GPS Live Badge */}
@@ -140,6 +141,19 @@ export default function MapScreen() {
             <Text style={styles.gpsText}>
               {driverLocation.latitude.toFixed(4)}, {driverLocation.longitude.toFixed(4)}
             </Text>
+          </View>
+        )}
+
+        {/* ETA Badge — shown when a real route is active */}
+        {routeEta != null && (
+          <View style={styles.etaBadge}>
+            <Feather name="clock" size={13} color={Colors.primary} />
+            <Text style={styles.etaText}>{routeEta}</Text>
+            {routeSteps && routeSteps.length > 0 && (
+              <Text style={styles.etaStep} numberOfLines={1}>
+                {routeSteps[0].instruction}
+              </Text>
+            )}
           </View>
         )}
 
@@ -344,6 +358,32 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Inter_600SemiBold",
     color: Colors.primary,
+  },
+  etaBadge: {
+    position: "absolute",
+    top: 48,
+    left: 16,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(17,24,39,0.93)",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.primary + "60",
+    maxWidth: 220,
+  },
+  etaText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.primary,
+  },
+  etaStep: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textMuted,
+    flexShrink: 1,
   },
   stepsOverlay: {
     position: "absolute",
