@@ -1,0 +1,32 @@
+# Keep Vercel upload small for backend-only deployment
+
+# dependencies/cache
+node_modules
+.pnpm-store
+.local
+.cache
+
+# VCS/editor
+.git
+.vscode
+
+# local runtime/config
+.env
+.env.*
+!.env.example
+.vercel
+
+# artifacts not needed for API deployment
+artifacts/mobile
+artifacts/mockup-sandbox
+B2B SaaS Food Delivery App
+attached_assets
+
+# docs and local scripts not needed at runtime
+docs
+supabase
+migrations
+*.md
+
+# macOS
+.DS_Store
