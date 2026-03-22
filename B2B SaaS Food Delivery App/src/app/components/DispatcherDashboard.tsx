@@ -156,29 +156,29 @@ export default function DispatcherDashboard() {
       const [ordersRes, restsRes] = await Promise.all([
         supabase
           .from("orders")
-          .select("order_number,customer_name,delivery_address,order_value,created_at,status,driver_id,delivery_lat,delivery_lng,restaurants(name)")
+          .select("external_id,customer_name,customer_address,fare,created_at,status,driver_id,customer_latitude,customer_longitude,restaurants(name)")
           .in("status", ["pending", "assigned"])
           .order("created_at", { ascending: false }),
-        supabase.from("restaurants").select("name,lat,lng"),
+        supabase.from("restaurants").select("name,latitude,longitude"),
       ]);
 
       if (!restsRes.error && restsRes.data) {
-        setRestaurants(restsRes.data.map((r: any) => ({ name: r.name, lat: Number(r.lat ?? 30.0444), lng: Number(r.lng ?? 31.2357) })));
+        setRestaurants(restsRes.data.map((r: any) => ({ name: r.name, lat: Number(r.latitude ?? 30.0444), lng: Number(r.longitude ?? 31.2357) })));
       }
 
       if (!ordersRes.error && ordersRes.data) {
         setOrders(
           ordersRes.data.map((o: any) => ({
-            id: o.order_number,
+            id: o.external_id,
             restaurant: o.restaurants?.name ?? "مطعم",
             customer: o.customer_name,
-            address: o.delivery_address,
-            value: `${Number(o.order_value ?? 0).toLocaleString("ar-EG")} ج.م`,
+            address: o.customer_address,
+            value: `${Number(o.fare ?? 0).toLocaleString("ar-EG")} ج.م`,
             time: o.created_at ? new Date(o.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—",
             status: o.status,
             driverId: o.driver_id ?? undefined,
-            lat: Number(o.delivery_lat ?? 30.0444),
-            lng: Number(o.delivery_lng ?? 31.2357),
+            lat: Number(o.customer_latitude ?? 30.0444),
+            lng: Number(o.customer_longitude ?? 31.2357),
           })),
         );
       }
@@ -225,7 +225,7 @@ export default function DispatcherDashboard() {
       void supabase
         .from("orders")
         .update({ status: "assigned", driver_id: driverId, assigned_at: new Date().toISOString() })
-        .eq("order_number", assigningOrderId);
+        .eq("external_id", assigningOrderId);
     }
 
     setOrders(prev => prev.map(o => o.id===assigningOrderId ? { ...o, status:"assigned" as const, driverId } : o));
@@ -242,7 +242,7 @@ export default function DispatcherDashboard() {
       void supabase
         .from("orders")
         .update({ status: "delivered", delivered_at: new Date().toISOString() })
-        .eq("order_number", orderId);
+        .eq("external_id", orderId);
     }
 
     setOrders(prev => prev.filter(o => o.id!==orderId));

@@ -329,7 +329,7 @@ export default function AdminDashboard() {
     const [ordersRes, settlementsRes, walletRes] = await Promise.all([
       supabase
         .from("orders")
-        .select("status,created_at,order_value")
+        .select("status,created_at,fare")
         .order("created_at", { ascending: false })
         .limit(1000),
       supabase
@@ -349,7 +349,7 @@ export default function AdminDashboard() {
         ordersRes.data.map((o: any) => ({
           status: o.status,
           created_at: o.created_at,
-          order_value: Number(o.order_value ?? 0),
+          order_value: Number(o.fare ?? 0),
         })),
       );
     }
