@@ -10,42 +10,53 @@ import { eq, sql } from "drizzle-orm";
 async function seed() {
   console.log("🌱 Seeding database...");
 
-  // Insert driver
-  const [driver] = await db
-    .insert(driversTable)
-    .values({
-      name: "محمد أحمد",
-      phone: "01012345678",
-      passwordHash: "hashed_1234",
-      avatarLetter: "م",
-      rank: "gold",
-      balance: "-85.50",
-      creditLimit: "500.00",
-      totalTrips: 247,
-      rating: "4.8",
-      isOnline: false,
-    })
-    .onConflictDoNothing()
-    .returning();
+  // ─── Add multiple drivers with status "available" ───────────────────────
+  const driversToAdd = [
+    { name: "محمد أحمد", phone: "01012345678", rank: "gold", isOnline: true },
+    { name: "علي محمود", phone: "01098765432", rank: "silver", isOnline: true },
+    { name: "كريم السيد", phone: "01187654321", rank: "bronze", isOnline: true },
+    { name: "حسين فاروق", phone: "01156789012", rank: "silver", isOnline: true },
+    { name: "إبراهيم محمد", phone: "01145678901", rank: "bronze", isOnline: true },
+    { name: "عمرو خالد", phone: "01134567890", rank: "gold", isOnline: true },
+  ];
 
-  let driverId: number;
-  if (!driver) {
-    console.log("Driver already exists, fetching...");
-    const [existing] = await db
-      .select()
-      .from(driversTable)
-      .where(eq(driversTable.phone, "01012345678"))
-      .limit(1);
-    if (!existing) {
-      console.error("No driver found");
-      process.exit(1);
+  const driverIds: number[] = [];
+  for (const driverData of driversToAdd) {
+    const [driver] = await db
+      .insert(driversTable)
+      .values({
+        name: driverData.name,
+        phone: driverData.phone,
+        passwordHash: "hashed_1234",
+        avatarLetter: driverData.name[0],
+        rank: driverData.rank,
+        balance: "0.00",
+        creditLimit: "500.00",
+        totalTrips: Math.floor(Math.random() * 100) + 20,
+        rating: (Math.random() * 1.5 + 4).toFixed(1),
+        isOnline: driverData.isOnline,
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    if (driver) {
+      driverIds.push(driver.id);
+      console.log(`  🛵 ${driver.name} (id=${driver.id}) — متاح`);
+    } else {
+      const [existing] = await db
+        .select()
+        .from(driversTable)
+        .where(eq(driversTable.phone, driverData.phone))
+        .limit(1);
+      if (existing) {
+        driverIds.push(existing.id);
+        console.log(`  🛵 ${existing.name} (id=${existing.id}) — موجود بالفعل`);
+      }
     }
-    driverId = existing.id;
-  } else {
-    driverId = driver.id;
   }
 
-  console.log(`✅ السواق جاهز (id=${driverId})`);
+  const driverId = driverIds[0];
+  console.log(`\n✅ ${driverIds.length} طيار جاهزين للتوصيل`);
 
   // ─── Restaurants (5 Cairo restaurants with real coordinates) ──────────────
   const restaurants = [

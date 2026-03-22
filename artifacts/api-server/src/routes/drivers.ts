@@ -148,4 +148,58 @@ router.post("/drivers/:id/earnings", async (req, res) => {
   }
 });
 
+// POST /api/drivers/seed/test-drivers — Seed test drivers (for development)
+router.post("/seed/test-drivers", async (req, res) => {
+  try {
+    const testDrivers = [
+      { name: "محمد أحمد", phone: "01012345678", rank: "gold", trips: 47 },
+      { name: "علي محمود", phone: "01098765432", rank: "silver", trips: 32 },
+      { name: "كريم السيد", phone: "01187654321", rank: "bronze", trips: 28 },
+      { name: "حسين فاروق", phone: "01156789012", rank: "silver", trips: 55 },
+      { name: "إبراهيم محمد", phone: "01145678901", rank: "bronze", trips: 19 },
+      { name: "عمرو خالد", phone: "01134567890", rank: "gold", trips: 78 },
+    ];
+
+    const inserted: typeof driversTable.$inferSelect[] = [];
+    for (const driver of testDrivers) {
+      const [row] = await db
+        .insert(driversTable)
+        .values({
+          name: driver.name,
+          phone: driver.phone,
+          passwordHash: "hashed_1234",
+          avatarLetter: driver.name.charAt(0),
+          rank: driver.rank as "gold" | "silver" | "bronze",
+          balance: "0.00",
+          creditLimit: "500.00",
+          totalTrips: driver.trips,
+          rating: (Math.random() * 1.5 + 4).toFixed(1),
+          isOnline: true,
+        })
+        .onConflictDoUpdate({
+          target: driversTable.phone,
+          set: { isOnline: true, totalTrips: driver.trips },
+        })
+        .returning();
+
+      inserted.push(row);
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: `تم إضافة ${inserted.length} طيار اختبار`,
+      drivers: inserted.map((d) => ({
+        id: d.id,
+        name: d.name,
+        phone: d.phone,
+        rank: d.rank,
+        isOnline: d.isOnline,
+      })),
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
