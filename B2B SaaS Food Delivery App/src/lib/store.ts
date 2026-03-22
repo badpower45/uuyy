@@ -47,37 +47,61 @@ let driversCache: Driver[] = [];
 let restaurantsCache: Restaurant[] = [];
 let lastSyncAt = 0;
 
+function isSchemaCacheColumnError(err: any): boolean {
+  const message = String(err?.message ?? "").toLowerCase();
+  const code = String(err?.code ?? "").toUpperCase();
+  return code === "PGRST204" || (message.includes("schema cache") && message.includes("column"));
+}
+
+function normalizeDriverStatus(value: any): DriverStatus {
+  if (value === "available" || value === "busy" || value === "offline") return value;
+  if (value === "active") return "available";
+  if (value === "inactive" || value === "suspended") return "offline";
+  return "offline";
+}
+
+function normalizeRestaurantStatus(value: any): RestaurantStatus {
+  if (value === "active" || value === "inactive" || value === "suspended") return value;
+  return "active";
+}
+
+function normalizeSubscription(value: any): SubscriptionType {
+  if (value === "basic" || value === "pro" || value === "enterprise") return value;
+  return "basic";
+}
+
 function mapDbDriver(row: any): Driver {
+  const status = normalizeDriverStatus(row.status);
   return {
-    id: row.id,
+    id: String(row.id),
     name: row.name,
     phone: row.phone,
     pin: "",
-    rank: row.rank,
+    rank: (row.rank ?? "bronze") as DriverRank,
     vehicleType: "motorcycle",
-    status: row.status,
-    wallet: Number(row.wallet_balance ?? 0),
-    orders: Number(row.orders_count ?? 0),
+    status,
+    wallet: Number(row.wallet_balance ?? row.balance ?? 0),
+    orders: Number(row.orders_count ?? row.total_trips ?? 0),
     rating: Number(row.rating ?? 5),
     warning: Boolean(row.has_warning),
-    lat: Number(row.lat ?? 30.0444),
-    lng: Number(row.lng ?? 31.2357),
+    lat: Number(row.lat ?? row.latitude ?? 30.0444),
+    lng: Number(row.lng ?? row.longitude ?? 31.2357),
     lastSeen: row.updated_at ? new Date(row.updated_at).getTime() : Date.now(),
-    isTracking: row.status !== "offline",
+    isTracking: status !== "offline" || Boolean(row.is_online),
   };
 }
 
 function mapDbRestaurant(row: any): Restaurant {
   return {
-    id: row.id,
+    id: String(row.id),
     name: row.name,
     phone: row.phone ?? "",
     address: row.address ?? "",
     city: row.city ?? "القاهرة",
-    subscription: row.subscription_type,
-    status: row.status,
-    lat: Number(row.lat ?? 30.0444),
-    lng: Number(row.lng ?? 31.2357),
+    subscription: normalizeSubscription(row.subscription_type),
+    status: normalizeRestaurantStatus(row.status),
+    lat: Number(row.lat ?? row.latitude ?? 30.0444),
+    lng: Number(row.lng ?? row.longitude ?? 31.2357),
     wallet: Number(row.wallet_balance ?? 0),
     orders: Number(row.total_orders ?? 0),
     pin: "",
@@ -171,6 +195,31 @@ export async function addDriver(data: Pick<Driver,'name'|'phone'|'pin'|'rank'|'v
     })
     .select("*")
     .single();
+
+  if (error && isSchemaCacheColumnError(error)) {
+    const { data: legacyInserted, error: legacyError } = await supabase
+      .from("drivers")
+      .insert({
+        name: d.name,
+        phone: d.phone,
+        password_hash: `pin_${d.pin || "1234"}`,
+        avatar_letter: d.name.trim().charAt(0) || "م",
+        rank: d.rank,
+        status: "active",
+      })
+      .select("*")
+      .single();
+
+    if (legacyError) {
+      throw new Error(legacyError.message || "تعذر حفظ بيانات الطيار في قاعدة البيانات");
+    }
+
+    const persistedLegacy = mapDbDriver(legacyInserted);
+    persistedLegacy.pin = d.pin;
+    persistedLegacy.vehicleType = d.vehicleType;
+    driversCache = [...drivers, persistedLegacy];
+    return persistedLegacy;
+  }
 
   if (error) {
     throw new Error(error.message || "تعذر حفظ بيانات الطيار في قاعدة البيانات");
@@ -284,6 +333,29 @@ export async function addRestaurant(data: Pick<Restaurant,'name'|'phone'|'pin'|'
     })
     .select("*")
     .single();
+
+  if (error && isSchemaCacheColumnError(error)) {
+    const { data: legacyInserted, error: legacyError } = await supabase
+      .from("restaurants")
+      .insert({
+        name: r.name,
+        phone: r.phone,
+        address: r.address,
+        latitude: r.lat,
+        longitude: r.lng,
+      })
+      .select("*")
+      .single();
+
+    if (legacyError) {
+      throw new Error(legacyError.message || "تعذر حفظ بيانات المطعم في قاعدة البيانات");
+    }
+
+    const persistedLegacy = mapDbRestaurant(legacyInserted);
+    persistedLegacy.pin = r.pin;
+    restaurantsCache = [...restaurants, persistedLegacy];
+    return persistedLegacy;
+  }
 
   if (error) {
     throw new Error(error.message || "تعذر حفظ بيانات المطعم في قاعدة البيانات");
