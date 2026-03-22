@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { toast } from "sonner";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   Wallet, User, Phone, MapPin, DollarSign, Send, Bell,
   Package, CheckCircle2, LogOut, ShoppingBag, LayoutDashboard,
@@ -15,6 +17,7 @@ type OrderStatus = "pending" | "assigned" | "picked" | "on_way" | "delivered";
 type Section = "dashboard" | "new-order" | "orders" | "history" | "menu" | "wallet";
 
 interface ActiveOrder {
+  dbId: number;
   id: string;
   customer: string;
   phone: string;
@@ -27,6 +30,21 @@ interface ActiveOrder {
   x: number;
   y: number;
 }
+
+interface OrderLiveTracking {
+  orderDbId: number;
+  orderNumber: string;
+  status: string;
+  driverLat: number;
+  driverLng: number;
+  recordedAt: string;
+  routePolyline: [number, number][];
+}
+
+type RestaurantGeo = {
+  lat: number;
+  lng: number;
+} | null;
 
 interface HistoryOrder {
   id: string;
@@ -90,6 +108,13 @@ export default function RestaurantPortal() {
   const [walletTxs, setWalletTxs] = useState<WalletTx[]>([]);
   const [restaurantId, setRestaurantId] = useState<string | null>(sessionStorage.getItem("swift_restaurant_id"));
   const [restaurantName, setRestaurantName] = useState("مطعمك");
+  const [restaurantGeo, setRestaurantGeo] = useState<RestaurantGeo>(null);
+  const [orderTrackingMap, setOrderTrackingMap] = useState<Record<string, OrderLiveTracking>>({});
+
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const routesLayerRef = useRef<L.LayerGroup | null>(null);
 
   /* Menu state */
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -136,6 +161,7 @@ export default function RestaurantPortal() {
   );
 
   const mapOrder = (row: any): ActiveOrder => ({
+    dbId: Number(row.id ?? 0),
     id: row.order_number,
     customer: row.customer_name,
     phone: row.customer_phone,
@@ -148,6 +174,206 @@ export default function RestaurantPortal() {
     x: Number(row.delivery_lat ?? 30.0444),
     y: Number(row.delivery_lng ?? 31.2357),
   });
+
+  const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "https://driver-master-api.vercel.app/api").replace(/\/$/, "");
+
+  const loadLiveTracking = async (currentOrders: ActiveOrder[]) => {
+    const candidateOrders = currentOrders.filter((o) =>
+      ["assigned", "picked", "on_way"].includes(o.status) && Number.isFinite(o.dbId) && o.dbId > 0,
+    );
+
+    if (!candidateOrders.length) {
+      setOrderTrackingMap({});
+      return;
+    }
+
+    const results = await Promise.all(
+      candidateOrders.map(async (order) => {
+        try {
+          const res = await fetch(`${API_BASE_URL}/orders/${order.dbId}/tracking`);
+          if (!res.ok) return null;
+          const data = await res.json();
+          if (!data?.trackingAvailable || !data?.driverLocation) return null;
+
+          const polyline: [number, number][] = Array.isArray(data?.route?.polyline)
+            ? data.route.polyline
+                .map((point: any) => {
+                  if (!Array.isArray(point) || point.length !== 2) return null;
+                  const lng = Number(point[0]);
+                  const lat = Number(point[1]);
+                  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+                  return [lat, lng] as [number, number];
+                })
+                .filter(Boolean)
+            : [];
+
+          return {
+            orderNumber: order.id,
+            data: {
+              orderDbId: order.dbId,
+              orderNumber: order.id,
+              status: data.status,
+              driverLat: Number(data.driverLocation.latitude),
+              driverLng: Number(data.driverLocation.longitude),
+              recordedAt: String(data.driverLocation.recordedAt ?? ""),
+              routePolyline: polyline,
+            } as OrderLiveTracking,
+          };
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    const nextMap: Record<string, OrderLiveTracking> = {};
+    for (const item of results) {
+      if (!item) continue;
+      nextMap[item.orderNumber] = item.data;
+    }
+    setOrderTrackingMap(nextMap);
+  };
+
+  useEffect(() => {
+    if (section !== "orders") return;
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [restaurantGeo?.lat ?? 30.0444, restaurantGeo?.lng ?? 31.2357],
+      zoom: 12,
+      zoomControl: true,
+      attributionControl: false,
+    });
+
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19,
+    }).addTo(map);
+
+    markersLayerRef.current = L.layerGroup().addTo(map);
+    routesLayerRef.current = L.layerGroup().addTo(map);
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+      markersLayerRef.current = null;
+      routesLayerRef.current = null;
+    };
+  }, [section, restaurantGeo?.lat, restaurantGeo?.lng]);
+
+  useEffect(() => {
+    if (section !== "orders") return;
+    const map = mapRef.current;
+    const markersLayer = markersLayerRef.current;
+    const routesLayer = routesLayerRef.current;
+    if (!map || !markersLayer || !routesLayer) return;
+
+    markersLayer.clearLayers();
+    routesLayer.clearLayers();
+
+    const bounds: L.LatLngExpression[] = [];
+
+    if (restaurantGeo) {
+      const restIcon = L.divIcon({
+        className: "",
+        html: `<div style="width:34px;height:34px;border-radius:50%;background:#f97316;border:3px solid #fff;box-shadow:0 4px 12px rgba(249,115,22,.45);display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;">🍽️</div>`,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+      });
+
+      L.marker([restaurantGeo.lat, restaurantGeo.lng], { icon: restIcon })
+        .addTo(markersLayer)
+        .bindPopup(`<div dir="rtl"><b>${restaurantName}</b><br/>موقع المطعم</div>`);
+      bounds.push([restaurantGeo.lat, restaurantGeo.lng]);
+    }
+
+    filteredOrders.forEach((order) => {
+      if (!Number.isFinite(order.x) || !Number.isFinite(order.y)) return;
+      const orderLat = order.x;
+      const orderLng = order.y;
+
+      const statusColor =
+        order.status === "on_way"
+          ? "#10b981"
+          : order.status === "picked"
+            ? "#a855f7"
+            : order.status === "assigned"
+              ? "#3b82f6"
+              : "#f59e0b";
+
+      const customerIcon = L.divIcon({
+        className: "",
+        html: `<div style="width:22px;height:22px;border-radius:50%;background:${statusColor};border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.35);"></div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11],
+      });
+
+      L.marker([orderLat, orderLng], { icon: customerIcon })
+        .addTo(markersLayer)
+        .bindPopup(`<div dir="rtl"><b>${order.id}</b><br/>${order.customer}<br/>${order.address}</div>`);
+
+      bounds.push([orderLat, orderLng]);
+
+      const tracking = orderTrackingMap[order.id];
+      if (tracking && Number.isFinite(tracking.driverLat) && Number.isFinite(tracking.driverLng)) {
+        const driverIcon = L.divIcon({
+          className: "",
+          html: `<div style="width:26px;height:26px;border-radius:50%;background:#2563eb;border:2px solid #fff;box-shadow:0 3px 10px rgba(37,99,235,.45);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;">🛵</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        });
+
+        L.marker([tracking.driverLat, tracking.driverLng], { icon: driverIcon })
+          .addTo(markersLayer)
+          .bindPopup(
+            `<div dir="rtl"><b>الطيار</b><br/>${tracking.orderNumber}<br/>${new Date(tracking.recordedAt || Date.now()).toLocaleTimeString("ar-EG")}</div>`,
+          );
+
+        bounds.push([tracking.driverLat, tracking.driverLng]);
+
+        const routePoints = tracking.routePolyline.length
+          ? tracking.routePolyline
+          : [
+              [tracking.driverLat, tracking.driverLng] as [number, number],
+              [orderLat, orderLng] as [number, number],
+            ];
+
+        L.polyline(routePoints, {
+          color: "#22c55e",
+          weight: 3,
+          opacity: 0.7,
+          dashArray: "7 5",
+        }).addTo(routesLayer);
+      }
+    });
+
+    if (bounds.length) {
+      const group = L.latLngBounds(bounds);
+      map.fitBounds(group, { padding: [30, 30], maxZoom: 14 });
+    }
+  }, [section, filteredOrders, orderTrackingMap, restaurantGeo, restaurantName]);
+
+  useEffect(() => {
+    if (!orders.length) {
+      setOrderTrackingMap({});
+      return;
+    }
+
+    let stopped = false;
+    const refresh = async () => {
+      await loadLiveTracking(orders);
+    };
+
+    void refresh();
+    const timer = setInterval(() => {
+      if (stopped) return;
+      void refresh();
+    }, 10000);
+
+    return () => {
+      stopped = true;
+      clearInterval(timer);
+    };
+  }, [orders]);
 
   const reloadFromDb = useMemo(() => async () => {
     if (!supabase) return;
@@ -170,7 +396,7 @@ export default function RestaurantPortal() {
     const [profileRes, ordersRes, menuRes, walletRes] = await Promise.all([
       supabase
         .from("restaurants")
-        .select("name")
+        .select("name,lat,lng,latitude,longitude")
         .eq("id", currentRestaurantId)
         .maybeSingle(),
       supabase
@@ -190,8 +416,16 @@ export default function RestaurantPortal() {
         .order("created_at", { ascending: false }),
     ]);
 
-    if (!profileRes.error && profileRes.data?.name) {
-      setRestaurantName(profileRes.data.name);
+    if (!profileRes.error && profileRes.data) {
+      if (profileRes.data.name) {
+        setRestaurantName(profileRes.data.name);
+      }
+
+      const lat = Number(profileRes.data.lat ?? profileRes.data.latitude);
+      const lng = Number(profileRes.data.lng ?? profileRes.data.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        setRestaurantGeo({ lat, lng });
+      }
     }
 
     if (!ordersRes.error && ordersRes.data) {
@@ -750,52 +984,24 @@ export default function RestaurantPortal() {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> تحديث لحظي
                   </div>
                 </div>
-                <div className="relative h-52 bg-gradient-to-bl from-slate-100 to-slate-200 overflow-hidden">
-                  <svg className="absolute inset-0 w-full h-full opacity-15">
-                    {[...Array(8)].map((_, i) => (
-                      <line key={`h${i}`} x1="0" y1={`${i * 12.5}%`} x2="100%" y2={`${i * 12.5}%`} stroke="#94a3b8" strokeWidth="0.5" />
-                    ))}
-                    {[...Array(8)].map((_, i) => (
-                      <line key={`v${i}`} x1={`${i * 12.5}%`} y1="0" x2={`${i * 12.5}%`} y2="100%" stroke="#94a3b8" strokeWidth="0.5" />
-                    ))}
-                  </svg>
-                  {/* Restaurant */}
-                  <div className="absolute top-1/2 right-1/2 translate-x-1/2 -translate-y-1/2 z-10">
-                    <div className="relative">
-                      <div className="w-9 h-9 rounded-full bg-orange-500 border-4 border-white shadow-xl flex items-center justify-center text-white">
-                        <ShoppingBag className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="absolute -inset-3 rounded-full border-2 border-orange-300 animate-ping opacity-25" />
-                    </div>
-                  </div>
-                  {/* Order dots */}
-                  {filteredOrders.map(order => (
-                    <div key={order.id} className="absolute group z-20" style={{ top: `${order.y}%`, right: `${order.x}%`, transform: "translate(50%,-50%)" }}>
-                      <div className={`w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[9px] cursor-default ${
-                        order.status === "on_way"   ? "bg-emerald-500" :
-                        order.status === "picked"   ? "bg-purple-500"  :
-                        order.status === "assigned" ? "bg-blue-500"    :
-                        "bg-amber-400"
-                      }`}>🛵</div>
-                      <div className="absolute -inset-1.5 rounded-full border border-current animate-ping opacity-25" />
-                      <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 bg-gray-900 text-white text-[10px] px-2 py-1 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        {order.id} — {order.customer}
-                      </div>
-                    </div>
-                  ))}
-                  {/* Legend */}
-                  <div className="absolute bottom-2 left-2 flex gap-1.5">
+                <div className="relative h-72 bg-slate-900 overflow-hidden">
+                  <div ref={mapContainerRef} className="absolute inset-0" />
+
+                  <div className="absolute top-2 left-2 flex flex-wrap gap-1.5 z-[450]">
                     {[
                       { color: "bg-amber-400", label: "معلق" },
-                      { color: "bg-blue-500",    label: "معيّن" },
-                      { color: "bg-purple-500",  label: "استلام" },
+                      { color: "bg-blue-500", label: "معيّن" },
+                      { color: "bg-purple-500", label: "استلام" },
                       { color: "bg-emerald-500", label: "في الطريق" },
-                    ].map(l => (
-                      <div key={l.label} className="flex items-center gap-1 bg-white/80 px-2 py-0.5 rounded-full text-[9px]">
+                    ].map((l) => (
+                      <div key={l.label} className="flex items-center gap-1 bg-black/65 text-white px-2 py-1 rounded-full text-[10px]">
                         <div className={`w-2 h-2 rounded-full ${l.color}`} />
                         {l.label}
                       </div>
                     ))}
+                    <div className="flex items-center gap-1 bg-black/65 text-emerald-300 px-2 py-1 rounded-full text-[10px]">
+                      🛵 مواقع الطيارين الحية: {Object.keys(orderTrackingMap).length}
+                    </div>
                   </div>
                 </div>
               </div>
