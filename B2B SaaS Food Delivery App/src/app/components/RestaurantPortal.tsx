@@ -162,17 +162,17 @@ export default function RestaurantPortal() {
 
   const mapOrder = (row: any): ActiveOrder => ({
     dbId: Number(row.id ?? 0),
-    id: row.order_number,
+    id: row.external_id,
     customer: row.customer_name,
     phone: row.customer_phone,
-    address: row.delivery_address,
-    value: Number(row.order_value ?? 0),
+    address: row.customer_address,
+    value: Number(row.fare ?? 0),
     status: row.status,
     driver: row.drivers?.name ?? null,
-    eta: row.estimated_minutes ? `${row.estimated_minutes} دقيقة` : "—",
+    eta: "—",
     createdAt: row.created_at ? new Date(row.created_at).toLocaleString("ar-EG") : "—",
-    x: Number(row.delivery_lat ?? 30.0444),
-    y: Number(row.delivery_lng ?? 31.2357),
+    x: Number(row.customer_latitude ?? 30.0444),
+    y: Number(row.customer_longitude ?? 31.2357),
   });
 
   const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || "https://driver-master-api.vercel.app/api").replace(/\/$/, "");
@@ -396,12 +396,12 @@ export default function RestaurantPortal() {
     const [profileRes, ordersRes, menuRes, walletRes] = await Promise.all([
       supabase
         .from("restaurants")
-        .select("name,lat,lng,latitude,longitude")
+        .select("name,latitude,longitude")
         .eq("id", currentRestaurantId)
         .maybeSingle(),
       supabase
         .from("orders")
-        .select("id,order_number,customer_name,customer_phone,delivery_address,delivery_lat,delivery_lng,order_value,status,estimated_minutes,created_at,driver_id,drivers(name)")
+        .select("id,external_id,customer_name,customer_phone,customer_address,customer_latitude,customer_longitude,fare,status,created_at,driver_id,drivers(name)")
         .eq("restaurant_id", currentRestaurantId)
         .order("created_at", { ascending: false }),
       supabase
@@ -422,7 +422,8 @@ export default function RestaurantPortal() {
       }
 
       const lat = Number(profileRes.data.lat ?? profileRes.data.latitude);
-      const lng = Number(profileRes.data.lng ?? profileRes.data.longitude);
+      const lat = Number(profileRes.data.latitude);
+      const lng = Number(profileRes.data.longitude);
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
         setRestaurantGeo({ lat, lng });
       }
@@ -435,10 +436,10 @@ export default function RestaurantPortal() {
       setOrders(active.map(mapOrder));
       setHistory(
         done.map((o: any) => ({
-          id: o.order_number,
+          id: o.external_id,
           customer: o.customer_name,
-          address: o.delivery_address,
-          value: Number(o.order_value ?? 0),
+          address: o.customer_address,
+          value: Number(o.fare ?? 0),
           status: o.status,
           driver: o.drivers?.name ?? "—",
           createdAt: o.created_at ? new Date(o.created_at).toLocaleString("ar-EG") : "—",
@@ -482,7 +483,7 @@ export default function RestaurantPortal() {
   }, [reloadFromDb]);
 
   /* ──── Submit new order ──── */
-  const submitOrder = () => {
+  const submitOrder = async () => {
     const errors: Record<string, string> = {};
     if (!form.name.trim())  errors.name    = "مطلوب";
     if (!form.phone.trim()) errors.phone   = "مطلوب";
@@ -497,30 +498,34 @@ export default function RestaurantPortal() {
 
     const orderNumber = `ORD-${Date.now().toString().slice(-6)}`;
 
-    supabase
-      .from("orders")
-      .insert({
-        order_number: orderNumber,
-        restaurant_id: restaurantId,
-        customer_name: form.name.trim(),
-        customer_phone: form.phone.trim(),
-        delivery_address: form.address.trim(),
-        order_value: Number(form.value),
-        status: "pending",
-        notes: form.notes.trim() || null,
-      })
-      .then(({ error }) => {
-        if (error) {
-          toast.error("فشل إنشاء الطلب");
-          return;
-        }
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .insert({
+          external_id: orderNumber,
+          restaurant_id: restaurantId,
+          customer_name: form.name.trim(),
+          customer_phone: form.phone.trim(),
+          customer_address: form.address.trim(),
+          fare: Number(form.value),
+          status: "pending",
+        });
 
-        void reloadFromDb();
-        setForm({ name: "", phone: "", address: "", value: "", notes: "" });
-        setFormErrors({});
-        setSection("orders");
-        toast.success(`✅ تم إنشاء الطلب ${orderNumber}`);
-      });
+      if (error) {
+        console.error("Order creation error:", error);
+        toast.error(`فشل إنشاء الطلب: ${error.message}`);
+        return;
+      }
+
+      void reloadFromDb();
+      setForm({ name: "", phone: "", address: "", value: "", notes: "" });
+      setFormErrors({});
+      setSection("orders");
+      toast.success(`✅ تم إنشاء الطلب ${orderNumber}`);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      toast.error("خطأ غير متوقع عند إنشاء الطلب");
+    }
   };
 
   /* ──── Advance status ──── */
@@ -535,7 +540,7 @@ export default function RestaurantPortal() {
     supabase
       .from("orders")
       .update({ status: cfg.next })
-      .eq("order_number", orderId)
+      .eq("external_id", orderId)
       .then(({ error }) => {
         if (error) {
           toast.error("فشل تحديث حالة الطلب");
