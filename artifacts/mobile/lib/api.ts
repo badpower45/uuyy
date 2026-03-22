@@ -194,8 +194,10 @@ export const apiClient = {
     }).catch(() => ({ ok: false as const })),
 
   // Orders
-  getIncomingOrder: () =>
-    apiFetch<ApiOrder | null>(`/orders/incoming`),
+  getIncomingOrder: (driverId?: number) => {
+    const url = driverId ? `/orders/incoming?driverId=${driverId}` : `/orders/incoming`;
+    return apiFetch<ApiOrder | null>(url);
+  },
 
   getActiveOrder: (driverId: number) =>
     apiFetch<ApiOrder | null>(`/orders/active/${driverId}`),

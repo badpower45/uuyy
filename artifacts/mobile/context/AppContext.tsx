@@ -260,7 +260,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (incomingPollRef.current) clearInterval(incomingPollRef.current);
     const poll = async () => {
       try {
-        const order = await apiClient.getIncomingOrder();
+        const order = await apiClient.getIncomingOrder(drivId);
         if (order) {
           setIncomingOrder({
             id: String(order.id),

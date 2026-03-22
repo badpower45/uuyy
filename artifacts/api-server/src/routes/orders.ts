@@ -5,9 +5,66 @@ import { eq, and, isNull, inArray } from "drizzle-orm";
 const router = Router();
 
 // GET /api/orders/incoming
-// Returns one pending unassigned order with restaurant info
+// Returns one pending unassigned order with restaurant info, OR the first assigned order for this driver
 router.get("/orders/incoming", async (req, res) => {
   try {
+    const driverId = req.query.driverId ? parseInt(req.query.driverId as string) : undefined;
+
+    // If driverId provided, get assigned orders for this driver
+    if (driverId && !isNaN(driverId)) {
+      const rows = await db
+        .select({
+          id: ordersTable.id,
+          externalId: ordersTable.externalId,
+          status: ordersTable.status,
+          customerName: ordersTable.customerName,
+          customerPhone: ordersTable.customerPhone,
+          customerAddress: ordersTable.customerAddress,
+          customerLatitude: ordersTable.customerLatitude,
+          customerLongitude: ordersTable.customerLongitude,
+          fare: ordersTable.fare,
+          cashToCollect: ordersTable.cashToCollect,
+          commission: ordersTable.commission,
+          distanceKm: ordersTable.distanceKm,
+          restaurantId: ordersTable.restaurantId,
+          restaurantName: restaurantsTable.name,
+          restaurantAddress: restaurantsTable.address,
+          restaurantLatitude: restaurantsTable.latitude,
+          restaurantLongitude: restaurantsTable.longitude,
+        })
+        .from(ordersTable)
+        .leftJoin(restaurantsTable, eq(ordersTable.restaurantId, restaurantsTable.id))
+        .where(
+          and(
+            eq(ordersTable.driverId, driverId),
+            inArray(ordersTable.status, ["assigned", "to_restaurant", "picked_up", "to_customer"])
+          )
+        )
+        .limit(1);
+
+      if (rows.length) {
+        const o = rows[0];
+        return res.json({
+          id: o.id,
+          externalId: o.externalId,
+          restaurantName: o.restaurantName ?? "مطعم",
+          restaurantAddress: o.restaurantAddress ?? "",
+          restaurantLatitude: o.restaurantLatitude ? parseFloat(String(o.restaurantLatitude)) : null,
+          restaurantLongitude: o.restaurantLongitude ? parseFloat(String(o.restaurantLongitude)) : null,
+          customerName: o.customerName,
+          customerPhone: o.customerPhone,
+          customerAddress: o.customerAddress,
+          customerLatitude: o.customerLatitude ? parseFloat(String(o.customerLatitude)) : null,
+          customerLongitude: o.customerLongitude ? parseFloat(String(o.customerLongitude)) : null,
+          fare: parseFloat(String(o.fare)),
+          cashToCollect: parseFloat(String(o.cashToCollect)),
+          commission: parseFloat(String(o.commission)),
+          distanceKm: o.distanceKm ? parseFloat(String(o.distanceKm)) : null,
+        });
+      }
+    }
+
+    // Otherwise, get pending unassigned orders
     const rows = await db
       .select({
         id: ordersTable.id,
@@ -43,17 +100,17 @@ router.get("/orders/incoming", async (req, res) => {
       externalId: o.externalId,
       restaurantName: o.restaurantName ?? "مطعم",
       restaurantAddress: o.restaurantAddress ?? "",
-      restaurantLatitude: o.restaurantLatitude ? parseFloat(o.restaurantLatitude) : null,
-      restaurantLongitude: o.restaurantLongitude ? parseFloat(o.restaurantLongitude) : null,
+      restaurantLatitude: o.restaurantLatitude ? parseFloat(String(o.restaurantLatitude)) : null,
+      restaurantLongitude: o.restaurantLongitude ? parseFloat(String(o.restaurantLongitude)) : null,
       customerName: o.customerName,
       customerPhone: o.customerPhone,
       customerAddress: o.customerAddress,
-      customerLatitude: o.customerLatitude ? parseFloat(o.customerLatitude) : null,
-      customerLongitude: o.customerLongitude ? parseFloat(o.customerLongitude) : null,
-      fare: parseFloat(o.fare),
-      cashToCollect: parseFloat(o.cashToCollect),
-      commission: parseFloat(o.commission),
-      distanceKm: o.distanceKm ? parseFloat(o.distanceKm) : null,
+      customerLatitude: o.customerLatitude ? parseFloat(String(o.customerLatitude)) : null,
+      customerLongitude: o.customerLongitude ? parseFloat(String(o.customerLongitude)) : null,
+      fare: parseFloat(String(o.fare)),
+      cashToCollect: parseFloat(String(o.cashToCollect)),
+      commission: parseFloat(String(o.commission)),
+      distanceKm: o.distanceKm ? parseFloat(String(o.distanceKm)) : null,
     });
   } catch (err) {
     console.error("Get incoming order error:", err);
