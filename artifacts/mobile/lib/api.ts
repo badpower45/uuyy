@@ -15,7 +15,7 @@ export function setApiTenantContext(ctx: {
   }
 }
 
-function getBaseUrl(): string {
+export function getApiBaseUrl(): string {
   const explicitBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
   if (explicitBaseUrl) {
     return explicitBaseUrl;
@@ -32,7 +32,7 @@ function getBaseUrl(): string {
   return process.env.EXPO_PUBLIC_PROD_API_BASE_URL || "https://driver-master-api.vercel.app/api";
 }
 
-const BASE_URL = getBaseUrl();
+const BASE_URL = getApiBaseUrl();
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const optionHeaders = (options?.headers ?? {}) as Record<string, string>;
@@ -77,6 +77,7 @@ export interface ApiWeeklyEarning {
 export interface ApiOrder {
   id: number;
   externalId?: string;
+  driverId?: number | null;
   status: string;
   restaurantName: string;
   restaurantAddress: string;
@@ -89,6 +90,7 @@ export interface ApiOrder {
   customerLongitude: number | null;
   fare: number;
   cashToCollect: number;
+  commission: number;
   distanceKm: number | null;
 }
 
@@ -100,21 +102,75 @@ export interface ApiRouteStep {
 
 export interface ApiOrderRoute {
   orderId: number;
+  driverId: number | null;
   status: string;
+  restaurantName: string;
+  restaurantAddress: string;
+  restaurantLocation: { lat: number; lng: number } | null;
   customerName: string;
   customerAddress: string;
+  customerLocation: { lat: number; lng: number };
+  currentDestination: {
+    label: string;
+    latitude: number;
+    longitude: number;
+  };
   route: {
+    provider: "google" | "mapbox" | "osrm";
+    trafficAware: boolean;
+    etaLabel: string;
+    activeLegIndex: number;
+    alternativeCount: number;
     totalDistanceKm: number;
     totalDurationMinutes: number;
     polyline: [number, number][];
+    fullPolyline: [number, number][];
+    alternatives: Array<{
+      distanceKm: number;
+      durationMinutes: number;
+    }>;
     legs: Array<{
       label: string;
       distanceKm: number;
       durationMinutes: number;
       steps: ApiRouteStep[];
       destination: { lat: number; lng: number };
+      polyline: [number, number][];
+      provider: "google" | "mapbox" | "osrm";
+      trafficAware: boolean;
+      alternativeCount: number;
     }>;
   };
+}
+
+export interface ApiTrackedDriverLocation {
+  latitude: number;
+  longitude: number;
+  accuracy: number | null;
+  heading: number | null;
+  speed: number | null;
+  recordedAt: string;
+  orderId: number | null;
+}
+
+export interface ApiOrderTracking {
+  orderId: number;
+  driverId: number | null;
+  status: string;
+  restaurantName: string;
+  restaurantAddress: string;
+  restaurantLocation: { lat: number; lng: number } | null;
+  customerName: string;
+  customerAddress: string;
+  customerLocation: { lat: number; lng: number } | null;
+  trackingAvailable: boolean;
+  driverLocation: ApiTrackedDriverLocation | null;
+  currentDestination: {
+    label: string;
+    latitude: number;
+    longitude: number;
+  } | null;
+  route: ApiOrderRoute["route"] | null;
 }
 
 export const apiClient = {
@@ -168,6 +224,9 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(params),
     }),
+
+  getOrderTracking: (orderId: number) =>
+    apiFetch<ApiOrderTracking>(`/orders/${orderId}/tracking`),
 
   getEta: (driverLat: number, driverLng: number, destLat: number, destLng: number) =>
     apiFetch<{ distanceKm: number; durationMinutes: number; etaIso: string; etaLabel: string }>(

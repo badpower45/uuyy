@@ -22,6 +22,7 @@ interface Props {
   longitude?: number;
   isTracking?: boolean;
   accuracy?: number | null;
+  heading?: number | null;
   routePolyline?: [number, number][] | null;
 }
 
@@ -40,6 +41,7 @@ export default function NativeMapView({
   longitude,
   isTracking,
   accuracy,
+  heading,
   routePolyline,
 }: Props) {
   const mapRef = useRef<MapView>(null);
@@ -63,9 +65,20 @@ export default function NativeMapView({
   useEffect(() => {
     if (!mapRef.current) return;
 
+    if (routePolyline && routePolyline.length > 1) {
+      const routeCoordinates = routePolyline.map(([lng2, lat2]) => ({
+        latitude: lat2,
+        longitude: lng2,
+      }));
+      mapRef.current.fitToCoordinates(routeCoordinates, {
+        edgePadding: { top: 100, right: 60, bottom: 120, left: 60 },
+        animated: true,
+      });
+      return;
+    }
+
     if (latitude && longitude) {
       if (orderStatus === "to_restaurant" || orderStatus === "to_customer") {
-        // Fit both driver and destination
         mapRef.current.fitToCoordinates(
           [
             { latitude: driverLat, longitude: driverLng },
@@ -83,7 +96,7 @@ export default function NativeMapView({
         );
       }
     }
-  }, [latitude, longitude, orderStatus]);
+  }, [latitude, longitude, orderStatus, routePolyline]);
 
   return (
     <View style={styles.container}>
@@ -123,7 +136,7 @@ export default function NativeMapView({
           zIndex={10}
         >
           <View style={styles.driverMarker}>
-            <View style={styles.driverMarkerInner}>
+            <View style={[styles.driverMarkerInner, heading != null ? { transform: [{ rotate: `${heading}deg` }] } : null]}>
               <Feather name="navigation" size={14} color="#fff" />
             </View>
           </View>

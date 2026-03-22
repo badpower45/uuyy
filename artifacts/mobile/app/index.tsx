@@ -16,14 +16,8 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useApp, type UserRole } from "@/context/AppContext";
+import { useApp } from "@/context/AppContext";
 import Colors from "@/constants/colors";
-
-const ROLES = [
-  { id: "driver" as UserRole, label: "السائق" },
-  { id: "restaurant" as UserRole, label: "المطعم" },
-  { id: "admin" as UserRole, label: "المشرف" },
-];
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -33,7 +27,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [activeRole, setActiveRole] = useState<UserRole>("driver");
   const [tenantFocused, setTenantFocused] = useState(false);
   const [phoneFocused, setPhoneFocused] = useState(false);
   const [passFocused, setPassFocused] = useState(false);
@@ -68,7 +61,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     await new Promise((r) => setTimeout(r, 900));
-    const success = login(phone.trim(), password.trim(), tenantCode.trim(), activeRole);
+    const success = login(phone.trim(), password.trim(), tenantCode.trim(), "driver");
     setLoading(false);
     if (success) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -135,25 +128,9 @@ export default function LoginScreen() {
               <Text style={styles.cardSubtitle}>أدخل بياناتك للوصول إلى لوحة التحكم</Text>
             </View>
 
-            {/* Role selector */}
-            <View style={styles.roleRow}>
-              {ROLES.map((role) => {
-                const isActive = activeRole === role.id;
-                return (
-                  <Pressable
-                    key={role.id}
-                    style={[styles.roleTab, isActive && styles.roleTabActive]}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setActiveRole(role.id);
-                    }}
-                  >
-                    <Text style={[styles.roleTabText, isActive && styles.roleTabTextActive]}>
-                      {role.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            <View style={styles.driverOnlyBadge}>
+              <Feather name="user-check" size={13} color={Colors.primary} />
+              <Text style={styles.driverOnlyBadgeText}>تسجيل دخول السائق فقط</Text>
             </View>
 
             {/* Tenant */}
@@ -274,13 +251,6 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
-            {/* Demo hint */}
-            <View style={styles.demoHint}>
-              <Feather name="info" size={13} color={Colors.textMuted} />
-              <Text style={styles.demoText}>
-                نموذج تجريبي: كود شركة + رقم هاتف (10 أرقام) + كلمة مرور (4 أحرف+)
-              </Text>
-            </View>
           </Animated.View>
 
           {/* Footer */}
@@ -414,6 +384,23 @@ const styles = StyleSheet.create({
   saasBadgeText: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
+    color: Colors.primary,
+  },
+  driverOnlyBadge: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 18,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.primary + "55",
+    backgroundColor: Colors.primary + "14",
+  },
+  driverOnlyBadgeText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
     color: Colors.primary,
   },
   logoWrap: {
@@ -628,19 +615,6 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 3,
     backgroundColor: "#000",
-  },
-  demoHint: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 16,
-  },
-  demoText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
-    textAlign: "right",
   },
   footerText: {
     fontSize: 11,

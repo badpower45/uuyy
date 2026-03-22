@@ -11,13 +11,17 @@ import * as Location from "expo-location";
 import { Platform, Linking, Alert } from "react-native";
 import {
   BACKGROUND_LOCATION_TASK,
+  clearBackgroundTrackingContext,
+  setBackgroundTrackingContext,
   setLocationUpdateCallback,
 } from "@/tasks/locationTask";
 import {
   apiClient,
+  getApiBaseUrl,
   setApiTenantContext,
   type ApiDriver,
   type ApiWeeklyEarning,
+  type ApiOrderTracking,
   type ApiOrderRoute,
 } from "@/lib/api";
 
@@ -53,6 +57,7 @@ export interface Order {
   distance: string;
   fare: number;
   cashToCollect: number;
+  commission: number;
   status: OrderStatus;
 }
 
@@ -122,6 +127,24 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function getDistanceMeters(
+  a: { latitude: number; longitude: number },
+  b: { latitude: number; longitude: number }
+) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusM = 6371000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h =
+    sinLat * sinLat +
+    Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+  return 2 * earthRadiusM * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [tenantId, setTenantId] = useState("pilot-main");
@@ -141,6 +164,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const incomingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const driverRef = useRef<Driver | null>(null);
+  const activeOrderRef = useRef<Order | null>(null);
+  const lastRouteRefreshRef = useRef<{
+    orderId: string;
+    status: OrderStatus;
+    latitude: number;
+    longitude: number;
+    at: number;
+  } | null>(null);
 
   // Fetch weekly earnings from real API
   const refreshEarnings = useCallback(async () => {
@@ -164,6 +196,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsLoadingEarnings(false);
     }
   }, [driver]);
+
+  useEffect(() => {
+    driverRef.current = driver;
+  }, [driver]);
+
+  useEffect(() => {
+    activeOrderRef.current = activeOrder;
+  }, [activeOrder]);
 
   // Fetch driver from API on login
   const fetchDriver = useCallback(async (phone: string): Promise<Driver | null> => {
@@ -199,10 +239,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const data: ApiOrderRoute = await apiClient.getOrderRoute({ driverLat, driverLng, orderId });
       if (data.route?.polyline?.length) {
         setRoutePolyline(data.route.polyline);
-        const mins = Math.round(data.route.totalDurationMinutes);
-        setRouteEta(`${mins} دقيقة`);
-        const allSteps = data.route.legs.flatMap((leg) => leg.steps);
-        setRouteSteps(allSteps);
+        setRouteEta(data.route.etaLabel);
+        const activeLeg = data.route.legs[data.route.activeLegIndex] ?? data.route.legs[0];
+        setRouteSteps(activeLeg?.steps ?? []);
+        lastRouteRefreshRef.current = {
+          orderId: String(orderId),
+          status: data.status as OrderStatus,
+          latitude: driverLat,
+          longitude: driverLng,
+          at: Date.now(),
+        };
       }
     } catch (err) {
       console.warn("Failed to fetch route:", err);
@@ -285,49 +331,90 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const lastSavedLocationRef = useRef<number>(0);
+  const syncBackgroundTracking = useCallback(async () => {
+    if (Platform.OS === "web") return;
+    const currentDriver = driverRef.current;
+
+    if (!isOnline || !currentDriver) {
+      await clearBackgroundTrackingContext().catch(() => {});
+      return;
+    }
+
+    await setBackgroundTrackingContext({
+      apiBaseUrl: getApiBaseUrl(),
+      driverId: currentDriver.id,
+      orderId: activeOrderRef.current ? parseInt(activeOrderRef.current.id) : null,
+    }).catch(() => {});
+  }, [isOnline]);
+
+  const pushLocationToBackend = useCallback((newLoc: DriverLocation) => {
+    const currentDriver = driverRef.current;
+    if (!currentDriver) return;
+
+    const currentOrder = activeOrderRef.current;
+    apiClient.saveLocation(currentDriver.id, {
+      latitude: newLoc.latitude,
+      longitude: newLoc.longitude,
+      accuracy: newLoc.accuracy,
+      heading: newLoc.heading,
+      speed: newLoc.speed,
+      orderId: currentOrder ? parseInt(currentOrder.id) : null,
+    }).catch(() => {});
+  }, []);
+
+  const maybeRefreshActiveRoute = useCallback((newLoc: DriverLocation) => {
+    const currentOrder = activeOrderRef.current;
+    if (!currentOrder) return;
+    if (currentOrder.status !== "to_restaurant" && currentOrder.status !== "to_customer") {
+      return;
+    }
+
+    const lastRefresh = lastRouteRefreshRef.current;
+    const now = Date.now();
+    const needsRefresh =
+      !lastRefresh ||
+      lastRefresh.orderId !== currentOrder.id ||
+      lastRefresh.status !== currentOrder.status ||
+      now - lastRefresh.at > 15000 ||
+      getDistanceMeters(
+        { latitude: lastRefresh.latitude, longitude: lastRefresh.longitude },
+        { latitude: newLoc.latitude, longitude: newLoc.longitude }
+      ) > 70;
+
+    if (!needsRefresh) return;
+    fetchRoute(parseInt(currentOrder.id), newLoc.latitude, newLoc.longitude);
+  }, [fetchRoute]);
+
+  const applyDriverLocation = useCallback((newLoc: DriverLocation) => {
+    setDriverLocation(newLoc);
+    setIsTrackingLocation(true);
+
+    const now = Date.now();
+    if (now - lastSavedLocationRef.current > 5000) {
+      lastSavedLocationRef.current = now;
+      pushLocationToBackend(newLoc);
+    }
+
+    maybeRefreshActiveRoute(newLoc);
+  }, [maybeRefreshActiveRoute, pushLocationToBackend]);
 
   const handleLocationUpdate = useCallback((loc: Location.LocationObject) => {
-    const newLoc = {
+    applyDriverLocation({
       latitude: loc.coords.latitude,
       longitude: loc.coords.longitude,
       accuracy: loc.coords.accuracy,
       heading: loc.coords.heading,
       speed: loc.coords.speed,
       timestamp: loc.timestamp,
-    };
-    setDriverLocation(newLoc);
-    setIsTrackingLocation(true);
-
-    // Save GPS ping to backend every 5 seconds
-    const now = Date.now();
-    if (now - lastSavedLocationRef.current > 5000) {
-      lastSavedLocationRef.current = now;
-      // Use functional form of setState to get latest driver + activeOrder
-      setDriver((currentDriver) => {
-        if (currentDriver) {
-          setActiveOrder((currentOrder) => {
-            apiClient.saveLocation(currentDriver.id, {
-              latitude: newLoc.latitude,
-              longitude: newLoc.longitude,
-              accuracy: newLoc.accuracy,
-              heading: newLoc.heading,
-              speed: newLoc.speed,
-              orderId: currentOrder ? parseInt(currentOrder.id) : null,
-            }).catch(() => {});
-            return currentOrder;
-          });
-        }
-        return currentDriver;
-      });
-    }
-  }, []);
+    });
+  }, [applyDriverLocation]);
 
   const startLocationTracking = useCallback(async () => {
     if (Platform.OS === "web") {
       if ("geolocation" in navigator) {
         const watchId = navigator.geolocation.watchPosition(
           (pos) => {
-            setDriverLocation({
+            applyDriverLocation({
               latitude: pos.coords.latitude,
               longitude: pos.coords.longitude,
               accuracy: pos.coords.accuracy,
@@ -335,7 +422,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
               speed: pos.coords.speed,
               timestamp: pos.timestamp,
             });
-            setIsTrackingLocation(true);
           },
           () => setIsTrackingLocation(false),
           { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
@@ -385,7 +471,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch {
       setIsTrackingLocation(false);
     }
-  }, [requestLocationPermission, handleLocationUpdate]);
+  }, [applyDriverLocation, requestLocationPermission, handleLocationUpdate]);
 
   const stopLocationTracking = useCallback(async () => {
     if (locationSubscription.current) {
@@ -407,6 +493,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         // Ignore cleanup errors
       }
     }
+    if (Platform.OS !== "web") {
+      clearBackgroundTrackingContext().catch(() => {});
+    }
     setIsTrackingLocation(false);
   }, []);
 
@@ -420,6 +509,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       stopLocationTracking();
     };
   }, [isOnline]);
+
+  useEffect(() => {
+    syncBackgroundTracking();
+  }, [syncBackgroundTracking, activeOrder?.id, activeOrder?.status, driver?.id]);
+
+  useEffect(() => {
+    if (!activeOrder) return;
+    if (userRole === "driver" && isTrackingLocation) return;
+
+    let cancelled = false;
+    const orderId = parseInt(activeOrder.id);
+
+    const refreshTracking = async () => {
+      try {
+        const tracking: ApiOrderTracking = await apiClient.getOrderTracking(orderId);
+        if (cancelled) return;
+
+        if (tracking.driverLocation) {
+          setDriverLocation({
+            latitude: tracking.driverLocation.latitude,
+            longitude: tracking.driverLocation.longitude,
+            accuracy: tracking.driverLocation.accuracy,
+            heading: tracking.driverLocation.heading,
+            speed: tracking.driverLocation.speed,
+            timestamp: new Date(tracking.driverLocation.recordedAt).getTime(),
+          });
+          setIsTrackingLocation(true);
+        }
+
+        if (tracking.route?.polyline?.length) {
+          setRoutePolyline(tracking.route.polyline);
+          setRouteEta(tracking.route.etaLabel);
+          const activeLeg = tracking.route.legs[tracking.route.activeLegIndex] ?? tracking.route.legs[0];
+          setRouteSteps(activeLeg?.steps ?? []);
+        }
+      } catch (err) {
+        console.warn("Order tracking poll failed:", err);
+      }
+    };
+
+    refreshTracking();
+    const interval = setInterval(refreshTracking, 12000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [activeOrder?.id, isTrackingLocation, userRole]);
 
   // Smart navigation: open Google Maps / Apple Maps with the right destination
   const navigateToDestination = useCallback(() => {
@@ -475,6 +611,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setUserRole(role);
       setApiTenantContext({ tenantId: normalizedTenant, role });
       setIsAuthenticated(true);
+
+      // Set immediate local profile to avoid blank screens while API resolves.
+      setDriver({
+        id: 1,
+        name: "سائق بايلوت",
+        phone,
+        avatar: "س",
+        rank: "gold",
+        balance: -85.5,
+        creditLimit: 500,
+        totalTrips: 0,
+        rating: 4.8,
+      });
+
       fetchDriver(phone).then((d) => {
         if (d) {
           setDriver(d);
@@ -581,6 +731,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           distance: apiOrder.distanceKm ? `${apiOrder.distanceKm} كم` : incomingOrder.distance,
           fare: apiOrder.fare,
           cashToCollect: apiOrder.cashToCollect,
+          commission: apiOrder.commission,
           status: "to_restaurant",
         };
         setActiveOrder(order);
@@ -629,22 +780,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       apiClient.advanceOrderStatus(orderId, nextStatus).catch(console.warn);
 
       // Re-fetch route if moving to next navigation leg
-      if (nextStatus === "to_customer" && driverLocation) {
-        fetchRoute(orderId, driverLocation.latitude, driverLocation.longitude);
+      if (nextStatus === "to_customer") {
+        const routeLat = driverLocation?.latitude ?? activeOrder.restaurantLatitude;
+        const routeLng = driverLocation?.longitude ?? activeOrder.restaurantLongitude;
+        fetchRoute(orderId, routeLat, routeLng);
       } else if (nextStatus === "picked_up") {
         setRoutePolyline(null);
         setRouteEta(null);
+        setRouteSteps([]);
       }
     } else {
       const orderId = parseInt(activeOrder.id);
       // Order delivered
       apiClient.advanceOrderStatus(orderId, "delivered").catch(console.warn);
       if (driver) {
-        const commission = activeOrder.fare * 0.25;
         apiClient.recordEarning(driver.id, {
           amount: activeOrder.fare,
           cashCollected: activeOrder.cashToCollect,
-          commission,
+          commission: activeOrder.commission,
           orderId,
         }).catch(console.warn);
       }
@@ -652,6 +805,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setRoutePolyline(null);
       setRouteEta(null);
       setRouteSteps([]);
+      lastRouteRefreshRef.current = null;
       setDriver((prev) => prev ? { ...prev, totalTrips: prev.totalTrips + 1 } : prev);
       setTimeout(() => refreshEarnings(), 1000);
       if (isOnline && driver) {

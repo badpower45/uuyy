@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, driversTable, earningsTable } from "@workspace/db";
+import { db, driversTable, earningsTable, ordersTable } from "@workspace/db";
 import { eq, gte, sql } from "drizzle-orm";
 
 const router = Router();
@@ -103,15 +103,41 @@ router.post("/drivers/:id/earnings", async (req, res) => {
     const { amount, cashCollected, commission, orderId } = req.body;
     const today = new Date().toISOString().split("T")[0];
 
+    let amountValue = Number(amount ?? 0);
+    let cashCollectedValue = Number(cashCollected ?? 0);
+    let commissionValue = Number(commission ?? 0);
+
+    // If linked to an order, use DB financial values as the source of truth.
+    if (orderId != null) {
+      const parsedOrderId = Number(orderId);
+      if (!Number.isNaN(parsedOrderId)) {
+        const [order] = await db
+          .select({
+            fare: ordersTable.fare,
+            cashToCollect: ordersTable.cashToCollect,
+            commission: ordersTable.commission,
+          })
+          .from(ordersTable)
+          .where(eq(ordersTable.id, parsedOrderId))
+          .limit(1);
+
+        if (order) {
+          amountValue = parseFloat(order.fare);
+          cashCollectedValue = parseFloat(order.cashToCollect);
+          commissionValue = parseFloat(order.commission);
+        }
+      }
+    }
+
     const [row] = await db
       .insert(earningsTable)
       .values({
         driverId,
         orderId: orderId ?? null,
         earningDate: today,
-        amount: String(amount ?? 0),
-        cashCollected: String(cashCollected ?? 0),
-        commission: String(commission ?? 0),
+        amount: String(amountValue),
+        cashCollected: String(cashCollectedValue),
+        commission: String(commissionValue),
       })
       .returning();
 

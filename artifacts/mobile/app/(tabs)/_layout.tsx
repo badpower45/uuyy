@@ -6,42 +6,41 @@ import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useApp } from "@/context/AppContext";
 
 function ClassicTabLayout() {
   const safeAreaInsets = useSafeAreaInsets();
-  const { userRole } = useApp();
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
-
-  const firstTab =
-    userRole === "admin"
-      ? { name: "super-admin", title: "السوبر أدمن", sf: "person.3.fill", icon: "shield" as const }
-      : userRole === "restaurant"
-        ? { name: "restaurant", title: "المطعم", sf: "building.2.fill", icon: "shopping-bag" as const }
-        : { name: "index", title: "الرئيسية", sf: "house", icon: "home" as const };
-
-  const secondTab =
-    userRole === "restaurant"
-      ? { title: "الخريطة", sf: "map.fill", icon: "map" as const }
-      : userRole === "admin"
-        ? { title: "المتابعة", sf: "map.fill", icon: "map" as const }
-        : { title: "الطلب", sf: "map", icon: "map" as const };
 
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerTitleAlign: "center",
+        headerStyle: {
+          backgroundColor: Colors.card,
+        },
+        headerTintColor: Colors.text,
+        headerShadowVisible: false,
+        headerTitleStyle: {
+          fontFamily: "Inter_700Bold",
+          fontSize: 16,
+        },
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: isIOS ? "transparent" : Colors.card,
-          borderTopWidth: 1,
-          borderTopColor: Colors.border,
+          borderTopWidth: 0,
           elevation: 0,
-          paddingBottom: safeAreaInsets.bottom,
-          ...(isWeb ? { height: 84 } : {}),
+          height: 66 + safeAreaInsets.bottom,
+          paddingBottom: safeAreaInsets.bottom + 8,
+          paddingTop: 8,
+          marginHorizontal: 14,
+          marginBottom: 10,
+          borderRadius: 18,
+          borderWidth: 1,
+          borderColor: Colors.border,
         },
         tabBarBackground: () =>
           isIOS ? (
@@ -62,26 +61,26 @@ function ClassicTabLayout() {
       }}
     >
       <Tabs.Screen
-        name={firstTab.name}
+        name="index"
         options={{
-          title: firstTab.title,
+          title: "الرئيسية",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name={firstTab.sf as any} tintColor={color} size={24} />
+              <SymbolView name={"house" as any} tintColor={color} size={24} />
             ) : (
-              <Feather name={firstTab.icon} size={22} color={color} />
+              <Feather name="home" size={22} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="map"
         options={{
-          title: secondTab.title,
+          title: "الطلب",
           tabBarIcon: ({ color }) =>
             isIOS ? (
-              <SymbolView name={secondTab.sf as any} tintColor={color} size={24} />
+              <SymbolView name={"map" as any} tintColor={color} size={24} />
             ) : (
-              <Feather name={secondTab.icon} size={22} color={color} />
+              <Feather name="map" size={22} color={color} />
             ),
         }}
       />
@@ -97,15 +96,8 @@ function ClassicTabLayout() {
             ),
         }}
       />
-
-      {/* Hidden routes (for role switching without remount issues) */}
-      {firstTab.name !== "index" && <Tabs.Screen name="index" options={{ href: null }} />}
-      {firstTab.name !== "super-admin" && (
-        <Tabs.Screen name="super-admin" options={{ href: null }} />
-      )}
-      {firstTab.name !== "restaurant" && (
-        <Tabs.Screen name="restaurant" options={{ href: null }} />
-      )}
+      <Tabs.Screen name="super-admin" options={{ href: null }} />
+      <Tabs.Screen name="restaurant" options={{ href: null }} />
     </Tabs>
   );
 }

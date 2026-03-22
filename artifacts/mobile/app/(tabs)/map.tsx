@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
 import { useApp } from "@/context/AppContext";
 import Colors from "@/constants/colors";
 import NativeMapView from "@/components/MapView";
@@ -70,6 +71,11 @@ export default function MapScreen() {
   const handleNavigate = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigateToDestination();
+  };
+
+  const handleOpenTracking = () => {
+    if (!activeOrder) return;
+    router.push({ pathname: "/order-tracking" as any, params: { orderId: activeOrder.id } });
   };
 
   const toggleSheet = () => {
@@ -131,6 +137,7 @@ export default function MapScreen() {
           longitude={driverLocation?.longitude}
           isTracking={isTrackingLocation}
           accuracy={driverLocation?.accuracy}
+          heading={driverLocation?.heading}
           routePolyline={routePolyline}
         />
 
@@ -275,6 +282,11 @@ export default function MapScreen() {
               </Text>
             </View>
           </View>
+
+          <Pressable style={styles.trackBtn} onPress={handleOpenTracking}>
+            <Feather name="radio" size={16} color={Colors.primary} />
+            <Text style={styles.trackBtnText}>فتح شاشة التتبع الحي للطلب</Text>
+          </Pressable>
         </ScrollView>
 
         {/* Action Buttons */}
@@ -515,6 +527,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  trackBtn: {
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.primary + "55",
+    backgroundColor: Colors.primary + "12",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row-reverse",
+    gap: 8,
+    marginBottom: 18,
+  },
+  trackBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.primary,
   },
   cashItem: {
     flex: 1,

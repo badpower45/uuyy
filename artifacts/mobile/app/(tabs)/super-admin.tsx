@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import NativeMapView from "@/components/MapView";
@@ -51,6 +52,7 @@ export default function SuperAdminScreen() {
   const restLng = activeOrder?.restaurantLongitude ?? incomingOrder?.restaurantLongitude;
   const custLat = activeOrder?.customerLatitude ?? incomingOrder?.customerLatitude;
   const custLng = activeOrder?.customerLongitude ?? incomingOrder?.customerLongitude;
+  const trackedOrderId = activeOrder?.id ?? incomingOrder?.id;
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}> 
@@ -96,6 +98,7 @@ export default function SuperAdminScreen() {
               longitude={driverLocation?.longitude}
               isTracking={isTrackingLocation}
               accuracy={driverLocation?.accuracy}
+              heading={driverLocation?.heading}
               routePolyline={routePolyline}
             />
           </View>
@@ -103,6 +106,16 @@ export default function SuperAdminScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>مدخلات الأدمن (تنعكس داخل التطبيق)</Text>
+
+          {trackedOrderId ? (
+            <Pressable
+              style={styles.liveTrackBtn}
+              onPress={() => router.push({ pathname: "/order-tracking" as any, params: { orderId: trackedOrderId } })}
+            >
+              <Feather name="radio" size={15} color={Colors.primary} />
+              <Text style={styles.liveTrackText}>فتح شاشة التتبع الحي</Text>
+            </Pressable>
+          ) : null}
 
           <Text style={styles.label}>اسم المطعم</Text>
           <TextInput style={styles.input} value={restaurantName} onChangeText={setRestaurantName} />
@@ -215,6 +228,19 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text, textAlign: "right", marginBottom: 10 },
   line: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary, textAlign: "right", marginBottom: 6 },
   label: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary, textAlign: "right", marginBottom: 6 },
+  liveTrackBtn: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary + "55",
+    backgroundColor: Colors.primary + "12",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row-reverse",
+    gap: 8,
+    marginBottom: 12,
+  },
+  liveTrackText: { color: Colors.primary, fontFamily: "Inter_700Bold", fontSize: 12 },
   input: {
     height: 44,
     borderRadius: 10,

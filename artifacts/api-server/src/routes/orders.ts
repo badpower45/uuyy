@@ -20,6 +20,7 @@ router.get("/orders/incoming", async (req, res) => {
         customerLongitude: ordersTable.customerLongitude,
         fare: ordersTable.fare,
         cashToCollect: ordersTable.cashToCollect,
+        commission: ordersTable.commission,
         distanceKm: ordersTable.distanceKm,
         restaurantId: ordersTable.restaurantId,
         restaurantName: restaurantsTable.name,
@@ -51,6 +52,7 @@ router.get("/orders/incoming", async (req, res) => {
       customerLongitude: o.customerLongitude ? parseFloat(o.customerLongitude) : null,
       fare: parseFloat(o.fare),
       cashToCollect: parseFloat(o.cashToCollect),
+      commission: parseFloat(o.commission),
       distanceKm: o.distanceKm ? parseFloat(o.distanceKm) : null,
     });
   } catch (err) {
@@ -80,6 +82,7 @@ router.get("/orders/active/:driverId", async (req, res) => {
         customerLongitude: ordersTable.customerLongitude,
         fare: ordersTable.fare,
         cashToCollect: ordersTable.cashToCollect,
+        commission: ordersTable.commission,
         distanceKm: ordersTable.distanceKm,
         assignedAt: ordersTable.assignedAt,
         restaurantName: restaurantsTable.name,
@@ -117,6 +120,7 @@ router.get("/orders/active/:driverId", async (req, res) => {
       customerLongitude: o.customerLongitude ? parseFloat(o.customerLongitude) : null,
       fare: parseFloat(o.fare),
       cashToCollect: parseFloat(o.cashToCollect),
+      commission: parseFloat(o.commission),
       distanceKm: o.distanceKm ? parseFloat(o.distanceKm) : null,
       assignedAt: o.assignedAt,
     });
@@ -177,6 +181,7 @@ router.post("/orders/:id/accept", async (req, res) => {
         customerLongitude: ordersTable.customerLongitude,
         fare: ordersTable.fare,
         cashToCollect: ordersTable.cashToCollect,
+        commission: ordersTable.commission,
         distanceKm: ordersTable.distanceKm,
         restaurantName: restaurantsTable.name,
         restaurantAddress: restaurantsTable.address,
@@ -203,11 +208,74 @@ router.post("/orders/:id/accept", async (req, res) => {
       customerLongitude: o.customerLongitude ? parseFloat(o.customerLongitude) : null,
       fare: parseFloat(o.fare),
       cashToCollect: parseFloat(o.cashToCollect),
+      commission: parseFloat(o.commission),
       distanceKm: o.distanceKm ? parseFloat(o.distanceKm) : null,
     });
   } catch (err) {
     console.error("Accept order error:", err);
     return res.status(500).json({ error: "فشل قبول الطلبية" });
+  }
+});
+
+// PATCH /api/orders/:id/financials
+// Manually control order monetary values
+router.patch("/orders/:id/financials", async (req, res) => {
+  try {
+    const orderId = parseInt(req.params.id);
+    const { fare, cashToCollect, commission } = req.body as {
+      fare?: number;
+      cashToCollect?: number;
+      commission?: number;
+    };
+
+    if (isNaN(orderId)) {
+      return res.status(400).json({ error: "رقم الطلبية غير صحيح" });
+    }
+
+    const nextFare = Number(fare);
+    const nextCash = Number(cashToCollect);
+    const nextCommission = Number(commission);
+
+    if (
+      Number.isNaN(nextFare) ||
+      Number.isNaN(nextCash) ||
+      Number.isNaN(nextCommission) ||
+      nextFare < 0 ||
+      nextCash < 0 ||
+      nextCommission < 0
+    ) {
+      return res.status(400).json({ error: "قيم مالية غير صحيحة" });
+    }
+
+    const [updated] = await db
+      .update(ordersTable)
+      .set({
+        fare: String(nextFare),
+        cashToCollect: String(nextCash),
+        commission: String(nextCommission),
+        updatedAt: new Date(),
+      })
+      .where(eq(ordersTable.id, orderId))
+      .returning({
+        id: ordersTable.id,
+        fare: ordersTable.fare,
+        cashToCollect: ordersTable.cashToCollect,
+        commission: ordersTable.commission,
+      });
+
+    if (!updated) {
+      return res.status(404).json({ error: "الطلبية غير موجودة" });
+    }
+
+    return res.json({
+      id: updated.id,
+      fare: parseFloat(updated.fare),
+      cashToCollect: parseFloat(updated.cashToCollect),
+      commission: parseFloat(updated.commission),
+    });
+  } catch (err) {
+    console.error("Update financials error:", err);
+    return res.status(500).json({ error: "فشل تحديث القيم المالية" });
   }
 });
 
