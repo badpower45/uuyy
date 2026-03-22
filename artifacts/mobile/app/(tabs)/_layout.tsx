@@ -73,6 +73,18 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="orders"
+        options={{
+          title: "الطلبات",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name={"bag" as any} tintColor={color} size={24} />
+            ) : (
+              <Feather name="inbox" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="map"
         options={{
           title: "الطلب",
