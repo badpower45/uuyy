@@ -737,15 +737,15 @@ export default function RestaurantPortal() {
         </header>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4 md:p-6 pb-24 lg:pb-6">
+        <div className="flex-1 overflow-auto p-3 md:p-4 pb-24 lg:pb-6">
 
           {/* ╔══════════════════════════════╗ */}
           {/* ║       DASHBOARD              ║ */}
           {/* ╚══════════════════════════════╝ */}
           {section === "dashboard" && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* KPIs */}
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                 {[
                   { label: "طلبات اليوم",  value: orders.length + todayHistory.length, icon: Package,    color: "orange",  change: "+٨%" },
                   { label: "إيرادات اليوم", value: `${todayRevenue + orders.reduce((s,o)=>s+o.value,0)} ج.م`, icon: DollarSign, color: "emerald", change: "+١٢%" },
@@ -851,14 +851,14 @@ export default function RestaurantPortal() {
           {/* ║       NEW ORDER              ║ */}
           {/* ╚══════════════════════════════╝ */}
           {section === "new-order" && (
-            <div className="max-w-xl">
-              <div className="bg-white rounded-2xl border border-border p-6">
-                <h2 className="text-lg mb-6 flex items-center gap-2" style={{ fontWeight: 600 }}>
+            <div className="max-w-2xl">
+              <div className="bg-white rounded-2xl border border-border p-4 md:p-5">
+                <h2 className="text-base md:text-lg mb-4 flex items-center gap-2" style={{ fontWeight: 600 }}>
                   <Package className="w-5 h-5 text-orange-600" />
                   إنشاء طلب توصيل جديد
                 </h2>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Name */}
                   <div>
                     <label className="block text-sm mb-1.5 text-muted-foreground">اسم العميل *</label>
@@ -988,7 +988,7 @@ export default function RestaurantPortal() {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> تحديث لحظي
                   </div>
                 </div>
-                <div className="relative h-72 bg-slate-900 overflow-hidden">
+                <div className="relative h-[500px] bg-slate-900 overflow-hidden rounded-2xl">
                   <div ref={mapContainerRef} className="absolute inset-0" />
 
                   <div className="absolute top-2 left-2 flex flex-wrap gap-1.5 z-[450]">
