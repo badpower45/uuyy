@@ -421,7 +421,6 @@ export default function RestaurantPortal() {
         setRestaurantName(profileRes.data.name);
       }
 
-      const lat = Number(profileRes.data.lat ?? profileRes.data.latitude);
       const lat = Number(profileRes.data.latitude);
       const lng = Number(profileRes.data.longitude);
       if (Number.isFinite(lat) && Number.isFinite(lng)) {
