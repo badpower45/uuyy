@@ -89,7 +89,7 @@ export default function MapScreen() {
     }).start();
   };
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const topPadding = Platform.OS === "web" ? 58 : insets.top + 6;
   const bottomPadding = Platform.OS === "web" ? 34 : insets.bottom;
   // Tab bar height — must push content above the tab bar (position: absolute)
   const TAB_BAR_HEIGHT = Platform.OS === "web" ? 84 : 49 + insets.bottom;
@@ -118,7 +118,7 @@ export default function MapScreen() {
 
   const sheetHeight = sheetAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [340, 540],
+    outputRange: [320, 520],
   });
 
   return (
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     backgroundColor: "rgba(17,24,39,0.90)",
-    borderRadius: 20,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderWidth: 1,
@@ -379,12 +379,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 6,
     backgroundColor: "rgba(17,24,39,0.93)",
-    borderRadius: 16,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: Colors.primary + "60",
-    maxWidth: 220,
+    maxWidth: 240,
   },
   etaText: {
     fontSize: 13,
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card + "E6",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 24,
+    borderRadius: 16,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
@@ -416,16 +416,16 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.card,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: 1,
     borderColor: Colors.border,
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     overflow: "hidden",
   },
   sheetHandle: {
     alignItems: "center",
-    paddingVertical: 16,
+    paddingVertical: 10,
   },
   handleBar: {
     width: 48,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 14,
   },
   orderIdBadge: {
     backgroundColor: Colors.card2,
@@ -471,21 +471,21 @@ const styles = StyleSheet.create({
   },
   infoCards: {
     backgroundColor: Colors.card2,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   infoCard: {
     flexDirection: "row-reverse",
     alignItems: "center",
-    gap: 16,
+    gap: 10,
   },
   infoCardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
     backgroundColor: Colors.primary + "22",
     alignItems: "center",
     justifyContent: "center",
@@ -495,20 +495,20 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   infoCardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     marginBottom: 4,
   },
   infoCardAddress: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
   },
   callBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: Colors.success + "22",
     alignItems: "center",
     justifyContent: "center",
@@ -516,21 +516,21 @@ const styles = StyleSheet.create({
   infoDivider: {
     height: 1,
     backgroundColor: Colors.border,
-    marginVertical: 16,
+    marginVertical: 10,
   },
   cashCard: {
     flexDirection: "row-reverse",
     backgroundColor: Colors.card2,
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
     alignItems: "center",
     borderWidth: 1,
     borderColor: Colors.border,
   },
   trackBtn: {
-    height: 48,
-    borderRadius: 16,
+    height: 42,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.primary + "55",
     backgroundColor: Colors.primary + "12",
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row-reverse",
     gap: 8,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   trackBtnText: {
     fontSize: 13,
@@ -556,7 +556,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cashValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   actionContainer: {
-    paddingTop: 16,
+    paddingTop: 12,
   },
   actionRow: {
     flexDirection: "row-reverse",
@@ -575,9 +575,9 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   navBtn: {
-    width: 110,
-    height: 60,
-    borderRadius: 18,
+    width: 108,
+    height: 50,
+    borderRadius: 14,
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
@@ -592,8 +592,8 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   actionBtn: {
-    height: 60,
-    borderRadius: 18,
+    height: 50,
+    borderRadius: 14,
     flexDirection: "row-reverse",
     alignItems: "center",
     justifyContent: "center",
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   actionBtnText: {
-    fontSize: 17,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
     color: "#000",
   },
@@ -616,30 +616,30 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: Colors.card,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     textAlign: "center",
     marginBottom: 12,
   },
   emptySubtitle: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 28,
+    lineHeight: 20,
+    marginBottom: 20,
   },
   emptyHint: {
     flexDirection: "row-reverse",
@@ -648,12 +648,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary + "1A",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.primary + "40",
   },
   emptyHintText: {
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.primary,
   },

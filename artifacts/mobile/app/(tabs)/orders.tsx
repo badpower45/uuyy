@@ -1,18 +1,53 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Pressable,
-  SafeAreaView,
   RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useApp } from "@/context/AppContext";
 import Colors from "@/constants/colors";
+
+function OrderCard({ title, tone, order }: { title: string; tone: "incoming" | "active"; order: any }) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTop}>
+        <View style={[styles.badge, { backgroundColor: tone === "incoming" ? Colors.warning : Colors.success }]}>
+          <Text style={styles.badgeText}>{tone === "incoming" ? "جديد" : "نشط"}</Text>
+        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
+
+      <View style={styles.sep} />
+
+      <View style={styles.row}>
+        <Feather name="shopping-bag" size={15} color={Colors.primary} />
+        <View style={styles.rowTextWrap}>
+          <Text style={styles.rowLabel}>المطعم</Text>
+          <Text style={styles.rowValue}>{order.restaurantName}</Text>
+          <Text style={styles.rowSub}>{order.restaurantAddress}</Text>
+        </View>
+      </View>
+
+      <View style={styles.row}>
+        <Feather name="home" size={15} color={Colors.accent} />
+        <View style={styles.rowTextWrap}>
+          <Text style={styles.rowLabel}>العميل</Text>
+          <Text style={styles.rowValue}>{order.customerAddress}</Text>
+        </View>
+      </View>
+
+      <View style={styles.footerRow}>
+        <Text style={styles.metaText}>{order.distance || "—"}</Text>
+        <Text style={[styles.metaText, { color: Colors.success }]}>{order.fare} ج.م</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
@@ -21,338 +56,98 @@ export default function OrdersScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
     setRefreshing(false);
-  };
-
-  const renderOrderCard = (order: any, type: "incoming" | "active") => {
-    if (!order) return null;
-
-    return (
-      <View key={type} style={[styles.card, { marginBottom: 12 }]}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.orderType}>
-            {type === "incoming" ? "📬 طلب جديد" : "🚗 الطلب الحالي"}
-          </Text>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: type === "incoming" ? Colors.warning : Colors.success },
-            ]}
-          >
-            <Text style={styles.statusText}>
-              {type === "incoming" ? "جديد" : "نشط"}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.divider} />
-
-        <View style={styles.orderInfo}>
-          <View style={styles.infoRow}>
-            <Feather name="map-pin" size={16} color={Colors.primary} />
-            <View style={styles.infoContent}>
-              <Text style={styles.label}>المطعم</Text>
-              <Text style={styles.value}>{order.restaurantName}</Text>
-              <Text style={styles.detail}>{order.restaurantAddress}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Feather name="home" size={16} color={Colors.danger} />
-            <View style={styles.infoContent}>
-              <Text style={styles.label}>العميل</Text>
-              <Text style={styles.value}>{order.customerAddress}</Text>
-            </View>
-          </View>
-
-          <View style={styles.infoRow}>
-            <Feather name="dollar-sign" size={16} color={Colors.success} />
-            <View style={styles.infoContent}>
-              <Text style={styles.label}>السعر</Text>
-              <Text style={[styles.value, { color: Colors.success }]}>
-                {order.fare} ج.م
-              </Text>
-            </View>
-          </View>
-
-          {order.distance && (
-            <View style={styles.infoRow}>
-              <Feather name="navigation" size={16} color={Colors.info} />
-              <View style={styles.infoContent}>
-                <Text style={styles.label}>المسافة</Text>
-                <Text style={styles.value}>{order.distance}</Text>
-              </View>
-            </View>
-          )}
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.actionButton,
-            { backgroundColor: type === "incoming" ? Colors.warning : Colors.primary },
-            pressed && { opacity: 0.7 },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          }}
-        >
-          <Feather name="arrow-right" size={18} color="white" />
-          <Text style={styles.actionButtonText}>
-            {type === "incoming" ? "عرض الطلب" : "متابعة"}
-          </Text>
-        </Pressable>
-      </View>
-    );
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + 20 },
-        ]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={Colors.primary} />}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Status Indicator */}
-        <View
-          style={[
-            styles.statusIndicator,
-            { backgroundColor: isOnline ? Colors.success : Colors.textMuted },
-          ]}
-        >
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: isOnline ? Colors.success : Colors.textMuted },
-            ]}
-          />
-          <Text style={styles.statusIndicatorText}>
-            {isOnline ? "متصل وجاهز لاستقبال الطلبات" : "غير متصل"}
-          </Text>
+        <View style={styles.headerCard}>
+          <View style={styles.livePill}>
+            <View style={[styles.liveDot, { backgroundColor: isOnline ? Colors.success : Colors.danger }]} />
+            <Text style={styles.liveText}>{isOnline ? "متصل" : "غير متصل"}</Text>
+          </View>
+
+          <Text style={styles.headerTitle}>صفحة الطلبات</Text>
+          {driver ? <Text style={styles.headerSub}>السائق: {driver.name} • {driver.totalTrips} رحلة</Text> : <Text style={styles.headerSub}>—</Text>}
         </View>
 
-        {/* Driver Info */}
-        {driver && (
-          <View style={styles.driverCard}>
-            <Text style={styles.driverName}>{driver.name}</Text>
-            <View style={styles.driverStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>الطلبات</Text>
-                <Text style={styles.statValue}>{driver.totalTrips}</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>التقييم</Text>
-                <Text style={styles.statValue}>⭐ {driver.rating}</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>الرصيد</Text>
-                <Text style={[styles.statValue, { color: Colors.success }]}>
-                  {driver.balance} ج.م
-                </Text>
-              </View>
-            </View>
+        {!!activeOrder && <OrderCard title="الطلب الحالي" tone="active" order={activeOrder} />}
+        {!!incomingOrder && <OrderCard title="طلب جديد" tone="incoming" order={incomingOrder} />}
+
+        {!activeOrder && !incomingOrder && (
+          <View style={styles.emptyCard}>
+            <Feather name="inbox" size={42} color={Colors.textMuted} />
+            <Text style={styles.emptyTitle}>لا توجد طلبات الآن</Text>
+            <Text style={styles.emptySub}>{isOnline ? "أي طلب جديد سيظهر هنا تلقائيًا" : "فعّل الاتصال أولًا لاستقبال الطلبات"}</Text>
           </View>
         )}
-
-        {/* Orders */}
-        <View style={styles.ordersSection}>
-          <Text style={styles.sectionTitle}>الطلبات</Text>
-
-          {activeOrder ? (
-            <>
-              {renderOrderCard(activeOrder, "active")}
-              {incomingOrder && renderOrderCard(incomingOrder, "incoming")}
-            </>
-          ) : incomingOrder ? (
-            renderOrderCard(incomingOrder, "incoming")
-          ) : (
-            <View style={styles.emptyState}>
-              <Feather name="inbox" size={48} color={Colors.textMuted} />
-              <Text style={styles.emptyStateText}>
-                {isOnline ? "لا توجد طلبات جديدة حالياً" : "قم بتفعيل الإنترنت أولاً"}
-              </Text>
-              <Text style={styles.emptyStateSubtext}>
-                {isOnline
-                  ? "ستظهر الطلبات الجديدة هنا تلقائياً"
-                  : "فعّل الاتصال بالإنترنت لاستقبال الطلبات"}
-              </Text>
-            </View>
-          )}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  statusIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    marginBottom: 16,
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusIndicatorText: {
-    color: "white",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  driverCard: {
-    backgroundColor: Colors.card,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 24,
+  container: { flex: 1, backgroundColor: Colors.background },
+  headerCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-  },
-  driverName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  driverStats: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-around",
-  },
-  statItem: {
-    alignItems: "center",
-    flex: 1,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: Colors.border,
-  },
-  ordersSection: {
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  card: {
     backgroundColor: Colors.card,
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 14,
+    marginBottom: 12,
+    alignItems: "flex-end",
+  },
+  livePill: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderWidth: 1,
     borderColor: Colors.border,
-  },
-  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 6,
+    marginBottom: 8,
+  },
+  liveDot: { width: 8, height: 8, borderRadius: 4 },
+  liveText: { color: Colors.textSecondary, fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  headerTitle: { color: Colors.text, fontFamily: "Inter_700Bold", fontSize: 20 },
+  headerSub: { color: Colors.textMuted, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 4 },
+
+  card: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 14,
     marginBottom: 12,
   },
-  orderType: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusText: {
-    color: "white",
-    fontSize: 11,
-    fontWeight: "600",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: Colors.border,
-    marginBottom: 12,
-  },
-  orderInfo: {
-    gap: 10,
-    marginBottom: 12,
-  },
-  infoRow: {
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "flex-start",
-  },
-  infoContent: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginBottom: 2,
-    textTransform: "uppercase",
-    fontWeight: "600",
-  },
-  value: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
-  },
-  detail: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  actionButton: {
-    flexDirection: "row",
+  cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  badgeText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 },
+  cardTitle: { color: Colors.text, fontFamily: "Inter_700Bold", fontSize: 15 },
+  sep: { height: 1, backgroundColor: Colors.border, marginVertical: 10 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 10 },
+  rowTextWrap: { flex: 1 },
+  rowLabel: { color: Colors.textMuted, fontFamily: "Inter_500Medium", fontSize: 11 },
+  rowValue: { color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 13, marginTop: 2 },
+  rowSub: { color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2 },
+  footerRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+  metaText: { color: Colors.textSecondary, fontFamily: "Inter_700Bold", fontSize: 13 },
+
+  emptyCard: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 28,
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 10,
   },
-  actionButtonText: {
-    color: "white",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  emptyState: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 48,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: Colors.text,
-    marginTop: 16,
-    textAlign: "center",
-  },
-  emptyStateSubtext: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    marginTop: 8,
-    textAlign: "center",
-  },
+  emptyTitle: { color: Colors.text, fontFamily: "Inter_700Bold", fontSize: 16, marginTop: 10 },
+  emptySub: { color: Colors.textMuted, fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 6, textAlign: "center" },
 });

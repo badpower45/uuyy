@@ -368,28 +368,6 @@ router.patch("/orders/:id/status", async (req, res) => {
       return res.status(404).json({ error: "الطلبية غير موجودة" });
     }
 
-    // If delivered, reset the order so next time incoming query shows a new one
-    if (status === "delivered") {
-      // Create a fresh copy as pending for demo purposes
-      const [orig] = await db.select().from(ordersTable).where(eq(ordersTable.id, orderId)).limit(1);
-      if (orig) {
-        await db.insert(ordersTable).values({
-          restaurantId: orig.restaurantId,
-          customerName: orig.customerName,
-          customerPhone: orig.customerPhone,
-          customerAddress: orig.customerAddress,
-          customerLatitude: orig.customerLatitude,
-          customerLongitude: orig.customerLongitude,
-          fare: orig.fare,
-          cashToCollect: orig.cashToCollect,
-          commission: orig.commission,
-          distanceKm: orig.distanceKm,
-          status: "pending",
-          externalId: `ORD-${Date.now()}`,
-        });
-      }
-    }
-
     return res.json({ id: updated.id, status: updated.status });
   } catch (err) {
     console.error("Advance order status error:", err);
@@ -405,6 +383,25 @@ router.post("/orders/:id/decline", async (req, res) => {
     if (isNaN(orderId)) {
       return res.status(400).json({ error: "رقم الطلبية غير صحيح" });
     }
+
+    const [updated] = await db
+      .update(ordersTable)
+      .set({
+        status: "pending",
+        driverId: null,
+        assignedAt: null,
+        pickedUpAt: null,
+        deliveredAt: null,
+        cancelledAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(ordersTable.id, orderId))
+      .returning({ id: ordersTable.id });
+
+    if (!updated) {
+      return res.status(404).json({ error: "الطلبية غير موجودة" });
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     console.error("Decline order error:", err);

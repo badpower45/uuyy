@@ -181,7 +181,17 @@ export const apiClient = {
   getWeeklyEarnings: (driverId: number) =>
     apiFetch<ApiWeeklyEarning[]>(`/drivers/${driverId}/earnings/weekly`),
 
-  recordEarning: (driverId: number, data: { amount: number; cashCollected: number; commission: number; orderId?: number }) =>
+  recordEarning: (
+    driverId: number,
+    data: {
+      amount: number;
+      cashCollected: number;
+      commission: number;
+      orderId?: number;
+      earningDate?: string;
+      tripsCount?: number;
+    }
+  ) =>
     apiFetch<{ id: number }>(`/drivers/${driverId}/earnings`, {
       method: "POST",
       body: JSON.stringify(data),

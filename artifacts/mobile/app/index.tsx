@@ -1,16 +1,16 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  Pressable,
+  Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
-  Animated,
-  Alert,
   StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,7 +32,7 @@ export default function LoginScreen() {
   const [passFocused, setPassFocused] = useState(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const topPadding = Platform.OS === "web" ? 56 : insets.top + 6;
 
   const shake = () => {
     Animated.sequence([
@@ -77,63 +77,64 @@ export default function LoginScreen() {
     <View style={styles.root}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.background} />
 
-      {/* Background glows */}
       <View style={styles.glowTR} />
       <View style={styles.glowBL} />
       <View style={styles.glowCenter} />
 
-      {/* Status bar row */}
-      <View style={[styles.topBar, { paddingTop: topPadding + 8 }]}>
-        <View style={styles.statusPill}>
+      <View style={[styles.topBar, { paddingTop: topPadding }]}> 
+        <View style={styles.metaPill}>
           <View style={styles.dotGreen} />
-          <Text style={styles.statusText}>متصل بالشبكة</Text>
+          <Text style={styles.metaText}>الخدمة مباشرة</Text>
         </View>
-        <View style={styles.statusPill}>
-          <Feather name="users" size={11} color={Colors.textSecondary} />
-          <Text style={styles.statusText}>١٢٤ طيار نشط</Text>
+        <View style={styles.metaPill}>
+          <Feather name="layers" size={11} color={Colors.textSecondary} />
+          <Text style={styles.metaText}>Design System موحد</Text>
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: 40 }]}
+          contentContainerStyle={[styles.scroll, { paddingBottom: Math.max(30, insets.bottom + 10) }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Logo + brand */}
           <View style={styles.brandBlock}>
             <View style={styles.logoWrap}>
-              <View style={styles.logoCircle}>
-                <Feather name="truck" size={32} color="#fff" />
+              <View style={styles.logoSquare}>
+                <Feather name="zap" size={30} color="#fff" />
               </View>
               <View style={styles.logoPing} />
             </View>
-            <Text style={styles.brandName}>بايلوت</Text>
-            <Text style={styles.brandTag}>منصة توصيل ذكية في الوقت الحقيقي</Text>
+            <Text style={styles.brandName}>سويفت لوجستكس</Text>
+            <Text style={styles.brandTag}>منصة توصيل الطعام الذكية</Text>
           </View>
 
-          <View style={styles.saasBadge}>
-            <Feather name="layers" size={13} color={Colors.primary} />
-            <Text style={styles.saasBadgeText}>وضع SaaS متعدد الشركات</Text>
+          <View style={styles.roleRow}>
+            <View style={[styles.roleCard, styles.roleCardActive]}>
+              <View style={styles.roleIconActive}><Feather name="truck" size={14} color="#fff" /></View>
+              <Text style={styles.roleLabelActive}>طيار</Text>
+            </View>
+            <View style={styles.roleCardMuted}>
+              <View style={styles.roleIconMuted}><Feather name="navigation" size={14} color={Colors.textMuted} /></View>
+              <Text style={styles.roleLabelMuted}>موزع</Text>
+            </View>
+            <View style={styles.roleCardMuted}>
+              <View style={styles.roleIconMuted}><Feather name="shield" size={14} color={Colors.textMuted} /></View>
+              <Text style={styles.roleLabelMuted}>أدمن</Text>
+            </View>
           </View>
 
-          {/* Login card */}
-          <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}>
-            {/* Card header */}
+          <Animated.View style={[styles.card, { transform: [{ translateX: shakeAnim }] }]}> 
             <View style={styles.cardHeader}>
               <Text style={styles.cardTitle}>تسجيل الدخول</Text>
-              <Text style={styles.cardSubtitle}>أدخل بياناتك للوصول إلى لوحة التحكم</Text>
+              <Text style={styles.cardSubtitle}>نفس لغة وتصميم نسخة الويب</Text>
             </View>
 
             <View style={styles.driverOnlyBadge}>
               <Feather name="user-check" size={13} color={Colors.primary} />
-              <Text style={styles.driverOnlyBadgeText}>تسجيل دخول السائق فقط</Text>
+              <Text style={styles.driverOnlyBadgeText}>وضع السائق مفعل</Text>
             </View>
 
-            {/* Tenant */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>كود الشركة (Workspace)</Text>
               <View style={[styles.inputRow, tenantFocused && styles.inputRowFocused]}>
@@ -152,16 +153,11 @@ export default function LoginScreen() {
                   onBlur={() => setTenantFocused(false)}
                 />
                 <View style={styles.fieldIcon}>
-                  <Feather
-                    name="briefcase"
-                    size={18}
-                    color={tenantFocused ? Colors.primary : Colors.textMuted}
-                  />
+                  <Feather name="briefcase" size={18} color={tenantFocused ? Colors.primary : Colors.textMuted} />
                 </View>
               </View>
             </View>
 
-            {/* Phone */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>رقم الهاتف</Text>
               <View style={[styles.inputRow, phoneFocused && styles.inputRowFocused]}>
@@ -184,7 +180,6 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* Password */}
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>كلمة المرور</Text>
               <View style={[styles.inputRow, passFocused && styles.inputRowFocused]}>
@@ -201,39 +196,24 @@ export default function LoginScreen() {
                   onFocus={() => setPassFocused(true)}
                   onBlur={() => setPassFocused(false)}
                 />
-                <Pressable
-                  style={styles.fieldIcon}
-                  onPress={() => setShowPassword((v) => !v)}
-                >
-                  <Feather
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={18}
-                    color={passFocused ? Colors.primary : Colors.textMuted}
-                  />
+                <Pressable style={styles.fieldIcon} onPress={() => setShowPassword((v) => !v)}>
+                  <Feather name={showPassword ? "eye-off" : "eye"} size={18} color={passFocused ? Colors.primary : Colors.textMuted} />
                 </Pressable>
               </View>
             </View>
 
-            {/* Forgot row */}
             <View style={styles.forgotRow}>
               <Pressable>
                 <Text style={styles.forgotLink}>نسيت كلمة المرور؟</Text>
               </Pressable>
               <View style={styles.rememberRow}>
                 <Text style={styles.rememberText}>تذكرني</Text>
-                <View style={styles.checkbox}>
-                  <Feather name="check" size={10} color={Colors.primary} />
-                </View>
+                <View style={styles.checkbox}><Feather name="check" size={10} color={Colors.primary} /></View>
               </View>
             </View>
 
-            {/* Login button */}
             <Pressable
-              style={({ pressed }) => [
-                styles.loginBtn,
-                pressed && styles.loginBtnPressed,
-                loading && { opacity: 0.7 },
-              ]}
+              style={({ pressed }) => [styles.loginBtn, pressed && styles.loginBtnPressed, loading && { opacity: 0.7 }]}
               onPress={handleLogin}
               disabled={loading}
             >
@@ -251,12 +231,10 @@ export default function LoginScreen() {
               )}
             </Pressable>
 
+            <Text style={styles.helperText}>أول دخول غالبًا بكلمة مرور افتراضية: 1234</Text>
           </Animated.View>
 
-          {/* Footer */}
-          <Text style={styles.footerText}>
-            بتسجيل دخولك، أنت توافق على شروط الخدمة وسياسة الخصوصية
-          </Text>
+          <Text style={styles.footerText}>بتسجيل دخولك، أنت توافق على شروط الخدمة وسياسة الخصوصية</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -268,85 +246,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
-  splashCenter: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  splashContent: {
-    alignItems: "center",
-    paddingHorizontal: 40,
-  },
-  loadingBar: {
-    width: 180,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    marginTop: 32,
-    overflow: "hidden",
-  },
-  loadingBarFill: {
-    width: "70%",
-    height: "100%",
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
-  loadingLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textMuted,
-    marginTop: 12,
-    textAlign: "center",
-  },
   glowTR: {
     position: "absolute",
-    top: -80,
-    right: -80,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
+    top: -120,
+    right: -100,
+    width: 320,
+    height: 320,
+    borderRadius: 160,
     backgroundColor: Colors.primary,
-    opacity: 0.12,
-    ...(Platform.OS === "web" ? { filter: "blur(70px)" } : {}),
-  } as any,
+    opacity: 0.11,
+  },
   glowBL: {
     position: "absolute",
-    bottom: -60,
-    left: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: Colors.primary,
-    opacity: 0.08,
-    ...(Platform.OS === "web" ? { filter: "blur(60px)" } : {}),
-  } as any,
+    bottom: -90,
+    left: -70,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: "#3b82f6",
+    opacity: 0.1,
+  },
   glowCenter: {
     position: "absolute",
-    top: "40%",
-    left: "50%",
-    marginLeft: -100,
+    top: 220,
+    left: -90,
     width: 200,
     height: 200,
     borderRadius: 100,
     backgroundColor: Colors.primary,
     opacity: 0.05,
-    ...(Platform.OS === "web" ? { filter: "blur(80px)" } : {}),
-  } as any,
-  topBar: {
-    flexDirection: "row-reverse",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 8,
   },
-  statusPill: {
-    flexDirection: "row-reverse",
+  topBar: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 18,
+    marginBottom: 8,
+  },
+  metaPill: {
+    flexDirection: "row",
     alignItems: "center",
     gap: 5,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-    paddingHorizontal: 10,
+    borderColor: "rgba(255,255,255,0.12)",
+    paddingHorizontal: 9,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 100,
   },
   dotGreen: {
     width: 7,
@@ -354,111 +301,130 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: Colors.primary,
   },
-  statusText: {
-    fontSize: 11,
+  metaText: {
+    fontSize: 10,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
   },
   scroll: {
     flexGrow: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
   },
   brandBlock: {
     alignItems: "center",
-    paddingTop: 16,
-    paddingBottom: 28,
-  },
-  saasBadge: {
-    flexDirection: "row-reverse",
-    alignSelf: "center",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.primary + "18",
-    borderWidth: 1,
-    borderColor: Colors.primary + "50",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginBottom: 14,
-  },
-  saasBadgeText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.primary,
-  },
-  driverOnlyBadge: {
-    flexDirection: "row-reverse",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginBottom: 18,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.primary + "55",
-    backgroundColor: Colors.primary + "14",
-  },
-  driverOnlyBadgeText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.primary,
+    paddingTop: 10,
+    paddingBottom: 16,
   },
   logoWrap: {
     position: "relative",
-    marginBottom: 14,
+    marginBottom: 10,
   },
-  logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: Colors.primary,
+  logoSquare: {
+    width: 74,
+    height: 74,
+    borderRadius: 18,
+    backgroundColor: "#10b981",
     alignItems: "center",
     justifyContent: "center",
     shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
-    shadowRadius: 20,
-    elevation: 12,
+    shadowRadius: 18,
+    elevation: 8,
   },
   logoPing: {
     position: "absolute",
-    top: -4,
+    top: -5,
     right: -4,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 1.5,
-    borderColor: Colors.primary,
-    opacity: 0.3,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: Colors.background,
+    backgroundColor: Colors.primary,
   },
   brandName: {
-    fontSize: 36,
+    fontSize: 26,
     fontFamily: "Inter_700Bold",
-    color: Colors.primary,
-    letterSpacing: 1,
-    marginBottom: 6,
+    color: Colors.text,
+    marginBottom: 5,
   },
   brandTag: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center",
   },
-  card: {
-    backgroundColor: Colors.card,
-    borderRadius: 20,
-    padding: 24,
+  roleRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  roleCard: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.07)",
+    gap: 4,
+  },
+  roleCardActive: {
+    backgroundColor: "rgba(255,255,255,0.1)",
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  roleCardMuted: {
+    flex: 1,
+    borderRadius: 16,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    gap: 4,
+  },
+  roleIconActive: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roleIconMuted: {
+    width: 28,
+    height: 28,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  roleLabelActive: {
+    fontSize: 11,
+    color: Colors.text,
+    fontFamily: "Inter_600SemiBold",
+  },
+  roleLabelMuted: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontFamily: "Inter_500Medium",
+  },
+  card: {
+    backgroundColor: "rgba(17,24,39,0.86)",
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.10)",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.4,
-    shadowRadius: 32,
-    elevation: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 10,
   },
   cardHeader: {
-    alignItems: "flex-end",
-    marginBottom: 20,
+    marginBottom: 10,
   },
   cardTitle: {
     fontSize: 24,
@@ -467,60 +433,46 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-    textAlign: "right",
   },
-  roleRow: {
-    flexDirection: "row-reverse",
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  roleTab: {
-    flex: 1,
-    paddingVertical: 9,
+  driverOnlyBadge: {
+    flexDirection: "row",
     alignItems: "center",
-    borderRadius: 8,
+    gap: 6,
+    marginBottom: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(34,197,94,0.35)",
+    backgroundColor: "rgba(34,197,94,0.12)",
+    alignSelf: "flex-start",
   },
-  roleTabActive: {
-    backgroundColor: Colors.primary,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  roleTabText: {
-    fontSize: 13,
+  driverOnlyBadgeText: {
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-  },
-  roleTabTextActive: {
-    color: "#000",
+    color: Colors.primary,
   },
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   fieldLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     textAlign: "right",
-    marginBottom: 7,
+    marginBottom: 6,
   },
   inputRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
-    backgroundColor: Colors.background,
-    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
-    height: 52,
+    borderColor: "rgba(255,255,255,0.13)",
+    minHeight: 50,
     overflow: "hidden",
   },
   inputRowFocused: {
@@ -537,25 +489,25 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: "right",
     paddingHorizontal: 14,
-    height: "100%",
+    minHeight: 50,
   },
   fieldIcon: {
-    width: 46,
-    height: "100%",
+    width: 42,
+    minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     borderLeftWidth: 1,
-    borderLeftColor: Colors.border,
+    borderLeftColor: "rgba(255,255,255,0.1)",
   },
   forgotRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
-    marginTop: 2,
+    marginBottom: 14,
+    marginTop: 4,
   },
   rememberRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 7,
   },
@@ -580,9 +532,9 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
   loginBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    height: 54,
+    backgroundColor: "#10b981",
+    borderRadius: 14,
+    minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: Colors.primary,
@@ -596,33 +548,39 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.985 }],
   },
   loginBtnText: {
-    fontSize: 17,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
-    color: "#000",
-    letterSpacing: 0.3,
+    color: "#fff",
   },
   loadingRow: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     alignItems: "center",
     gap: 8,
   },
   loadingDots: {
-    flexDirection: "row-reverse",
+    flexDirection: "row",
     gap: 4,
   },
   loadingDot: {
     width: 5,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#000",
+    backgroundColor: "#fff",
+  },
+  helperText: {
+    marginTop: 10,
+    color: Colors.textMuted,
+    fontSize: 11,
+    textAlign: "center",
+    fontFamily: "Inter_400Regular",
   },
   footerText: {
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textMuted,
     textAlign: "center",
-    marginTop: 24,
+    marginTop: 14,
     lineHeight: 17,
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
 });

@@ -47,6 +47,13 @@ let driversCache: Driver[] = [];
 let restaurantsCache: Restaurant[] = [];
 let lastSyncAt = 0;
 
+function ensureSupabase() {
+  if (!supabase) {
+    throw new Error("Supabase غير مفعّل: لا يمكن تنفيذ عمليات الكتابة على قاعدة البيانات");
+  }
+  return supabase;
+}
+
 function isSchemaCacheColumnError(err: any): boolean {
   const message = String(err?.message ?? "").toLowerCase();
   const code = String(err?.code ?? "").toUpperCase();
@@ -141,14 +148,14 @@ export const getDrivers = () => {
 
 export const saveDrivers = (d: Driver[]) => {
   driversCache = [...d];
-  if (!supabase) return;
+  const sb = ensureSupabase();
 
   void Promise.all(
     d.map(async (x) => {
       const id = Number(x.id);
       if (!Number.isFinite(id)) return;
 
-      const { error } = await supabase
+      const { error } = await sb
         .from("drivers")
         .update({
           name: x.name,
@@ -182,12 +189,9 @@ export async function addDriver(data: Pick<Driver,'name'|'phone'|'pin'|'rank'|'v
     lastSeen: 0, isTracking: false,
   };
 
-  if (!supabase) {
-    driversCache = [...drivers, d];
-    return d;
-  }
+  const sb = ensureSupabase();
 
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error } = await sb
     .from("drivers")
     .insert({
       name: d.name,
@@ -207,7 +211,7 @@ export async function addDriver(data: Pick<Driver,'name'|'phone'|'pin'|'rank'|'v
     .single();
 
   if (error && isSchemaCacheColumnError(error)) {
-    const { data: legacyInserted, error: legacyError } = await supabase
+    const { data: legacyInserted, error: legacyError } = await sb
       .from("drivers")
       .insert({
         name: d.name,
@@ -247,20 +251,19 @@ export function updateDriverLocation(id: string, lat: number, lng: number): void
     d.id === id ? { ...d, lat, lng, isTracking: true, lastSeen: Date.now() } : d
   );
 
-  if (supabase) {
-    void supabase
-      .from("driver_locations")
-      .insert({
-        driver_id: Number(id),
-        latitude: lat,
-        longitude: lng,
-      });
+  const sb = ensureSupabase();
+  void sb
+    .from("driver_locations")
+    .insert({
+      driver_id: Number(id),
+      latitude: lat,
+      longitude: lng,
+    });
 
-    void supabase
-      .from("drivers")
-      .update({ is_online: true, last_seen_at: new Date().toISOString() })
-      .eq("id", Number(id));
-  }
+  void sb
+    .from("drivers")
+    .update({ is_online: true, last_seen_at: new Date().toISOString() })
+    .eq("id", Number(id));
 }
 
 export function updateDriverStatus(id: string, status: DriverStatus): void {
@@ -268,16 +271,15 @@ export function updateDriverStatus(id: string, status: DriverStatus): void {
     d.id === id ? { ...d, status, isTracking: status !== 'offline', lastSeen: Date.now() } : d
   );
 
-  if (supabase) {
-    void supabase
-      .from("drivers")
-      .update({
-        status: status === "offline" ? "inactive" : "active",
-        is_online: status !== "offline",
-        last_seen_at: new Date().toISOString(),
-      })
-      .eq("id", Number(id));
-  }
+  const sb = ensureSupabase();
+  void sb
+    .from("drivers")
+    .update({
+      status: status === "offline" ? "inactive" : "active",
+      is_online: status !== "offline",
+      last_seen_at: new Date().toISOString(),
+    })
+    .eq("id", Number(id));
 }
 
 export function loginDriver(phone: string, pin: string): Driver | null {
@@ -304,7 +306,7 @@ export const getRestaurants = () => {
 
 export const saveRestaurants = (r: Restaurant[]) => {
   restaurantsCache = [...r];
-  if (!supabase) return;
+  const sb = ensureSupabase();
 
   const payload = r.map((x) => ({
     id: x.id,
@@ -320,7 +322,7 @@ export const saveRestaurants = (r: Restaurant[]) => {
     total_orders: x.orders,
   }));
 
-  void supabase.from("restaurants").upsert(payload, { onConflict: "id" });
+  void sb.from("restaurants").upsert(payload, { onConflict: "id" });
 };
 
 export async function addRestaurant(data: Pick<Restaurant,'name'|'phone'|'pin'|'address'|'city'|'subscription'>): Promise<Restaurant> {
@@ -333,12 +335,9 @@ export async function addRestaurant(data: Pick<Restaurant,'name'|'phone'|'pin'|'
     lng: 31.2357 + (Math.random() - 0.5) * 0.08,
   };
 
-  if (!supabase) {
-    restaurantsCache = [...restaurants, r];
-    return r;
-  }
+  const sb = ensureSupabase();
 
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error } = await sb
     .from("restaurants")
     .insert({
       id: r.id,
@@ -357,7 +356,7 @@ export async function addRestaurant(data: Pick<Restaurant,'name'|'phone'|'pin'|'
     .single();
 
   if (error && isSchemaCacheColumnError(error)) {
-    const { data: legacyInserted, error: legacyError } = await supabase
+    const { data: legacyInserted, error: legacyError } = await sb
       .from("restaurants")
       .insert({
         name: r.name,

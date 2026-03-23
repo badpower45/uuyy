@@ -17,18 +17,19 @@ import Colors from "@/constants/colors";
 
 export default function WalletScreen() {
   const insets = useSafeAreaInsets();
-  const { driver, weeklyEarnings, isLoadingEarnings, refreshEarnings } = useApp();
+  const { driver, weeklyEarnings, isLoadingEarnings, refreshEarnings, seedMockWalletData } = useApp();
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [isSeedingMock, setIsSeedingMock] = useState(false);
 
   if (!driver) return null;
 
-  const topPadding = Platform.OS === "web" ? 67 : insets.top;
+  const topPadding = Platform.OS === "web" ? 58 : insets.top + 6;
 
   const totalEarnings = weeklyEarnings.reduce((s, d) => s + d.earnings, 0);
   const totalTrips = weeklyEarnings.reduce((s, d) => s + d.trips, 0);
   const totalCash = weeklyEarnings.reduce((s, d) => s + d.cashCollected, 0);
   const totalCommission = weeklyEarnings.reduce((s, d) => s + d.commission, 0);
-  const maxEarnings = Math.max(...weeklyEarnings.map((d) => d.earnings));
+  const maxEarnings = Math.max(1, ...weeklyEarnings.map((d) => d.earnings));
 
   const isDebt = driver.balance < 0;
   const debtRatio = Math.abs(driver.balance) / driver.creditLimit;
@@ -38,6 +39,16 @@ export default function WalletScreen() {
   const handleDaySelect = (index: number) => {
     Haptics.selectionAsync();
     setSelectedDay(selectedDay === index ? null : index);
+  };
+
+  const handleSeedMockData = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIsSeedingMock(true);
+    try {
+      await seedMockWalletData();
+    } finally {
+      setIsSeedingMock(false);
+    }
   };
 
   return (
@@ -61,7 +72,23 @@ export default function WalletScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerTitle}>المحفظة والتقارير</Text>
-          <Text style={styles.headerSubtitle}>هذا الأسبوع</Text>
+          <Text style={styles.headerSubtitle}>ملخص أسبوعي مباشر</Text>
+          <Pressable
+            onPress={handleSeedMockData}
+            disabled={isSeedingMock || isLoadingEarnings}
+            style={({ pressed }) => [
+              styles.mockSeedBtn,
+              (isSeedingMock || isLoadingEarnings) && { opacity: 0.65 },
+              pressed && { opacity: 0.86, transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            {isSeedingMock ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Feather name="database" size={15} color="#fff" />
+            )}
+            <Text style={styles.mockSeedBtnText}>تحميل بيانات تجريبية</Text>
+          </Pressable>
         </View>
 
         {/* Balance Card */}
@@ -307,6 +334,19 @@ export default function WalletScreen() {
               <Text style={styles.dayRowDate}>{day.date}</Text>
             </Pressable>
           ))}
+
+          {!weeklyEarnings.length && (
+            <View style={styles.emptyCard}>
+              {isLoadingEarnings ? (
+                <ActivityIndicator color={Colors.primary} />
+              ) : (
+                <>
+                  <Feather name="bar-chart-2" size={28} color={Colors.textMuted} />
+                  <Text style={styles.emptyTitle}>لا توجد بيانات هذا الأسبوع</Text>
+                </>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
     </View>
@@ -318,40 +358,70 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  bgGlow: {
+    position: "absolute",
+    top: -80,
+    right: -60,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: Colors.primary,
+    opacity: 0.08,
+  },
   scrollContent: {
     paddingBottom: 100,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     alignItems: "flex-end",
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginBottom: 4,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+    marginBottom: 10,
+  },
+  mockSeedBtn: {
+    minHeight: 40,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: "stretch",
+    backgroundColor: Colors.primary,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  mockSeedBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
   },
   section: {
     paddingHorizontal: 20,
-    marginBottom: 28,
+    marginBottom: 18,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "right",
-    marginBottom: 16,
+    marginBottom: 10,
   },
   balanceCard: {
     backgroundColor: Colors.card,
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 18,
+    padding: 16,
     borderWidth: 1,
   },
   balanceTop: {
@@ -370,13 +440,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   balanceAmount: {
-    fontSize: 38,
+    fontSize: 30,
     fontFamily: "Inter_700Bold",
   },
   balanceIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -413,27 +483,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   alertText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
     textAlign: "right",
   },
   summaryGrid: {
     flexDirection: "row-reverse",
-    gap: 12,
+    gap: 10,
   },
   summaryCard: {
     flex: 1,
     backgroundColor: Colors.card,
-    borderRadius: 18,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
     alignItems: "center",
     gap: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
   summaryValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
   },
@@ -444,8 +514,8 @@ const styles = StyleSheet.create({
   },
   chartCard: {
     backgroundColor: Colors.card,
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 14,
+    padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -487,9 +557,9 @@ const styles = StyleSheet.create({
   },
   dayDetail: {
     backgroundColor: Colors.card2,
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 20,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -521,11 +591,11 @@ const styles = StyleSheet.create({
   },
   dayRow: {
     backgroundColor: Colors.card,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     flexDirection: "row-reverse",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -560,9 +630,23 @@ const styles = StyleSheet.create({
   },
   dayRowDate: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "left",
+  },
+  emptyCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  emptyTitle: {
+    color: Colors.textMuted,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
   },
 });

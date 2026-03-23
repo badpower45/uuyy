@@ -23,6 +23,7 @@ import { supabase } from "../../lib/supabase";
 type AdminSection = "overview" | "restaurants" | "drivers" | "subscriptions" | "finance";
 interface Settlement { id: number; name: string; type: string; amount: number; status: "paid"|"unpaid"; date: string; }
 interface WalletTx { amount: number; type: "credit" | "debit"; created_at: string; }
+interface EarningTx { amount: number; cash_collected: number; commission: number; created_at: string; }
 const subPlans = [
   { key:"basic",      label:"أساسي",   price:"٢٩٩ ج.م/شهر",   color:"gray",    features:["٥٠ طلب/يوم","تقارير أساسية","دعم بالبريد"] },
   { key:"pro",        label:"احترافي", price:"٧٩٩ ج.م/شهر",   color:"emerald", features:["٢٠٠ طلب/يوم","تقارير متقدمة","دعم فوري","API Access"] },
@@ -263,6 +264,7 @@ export default function AdminDashboard() {
   const [settlements, setSettlements]     = useState<Settlement[]>([]);
   const [ordersStats, setOrdersStats]     = useState<Array<{ status: string; created_at: string; order_value: number }>>([]);
   const [walletTxs, setWalletTxs]         = useState<WalletTx[]>([]);
+  const [earningTxs, setEarningTxs]       = useState<EarningTx[]>([]);
   const [restaurantCodes, setRestaurantCodes] = useState<Record<string, string>>({});
   const [searchDrivers, setSearchDrivers] = useState("");
   const [filterRank, setFilterRank]       = useState<"all"|DriverRank>("all");
@@ -326,7 +328,7 @@ export default function AdminDashboard() {
     setSettlements(fallbackSettlementsFromCache(currentRestaurants, rankedDrivers));
 
     if (!supabase) return;
-    const [ordersRes, settlementsRes, walletRes] = await Promise.all([
+    const [ordersRes, settlementsRes, walletRes, earningsRes] = await Promise.all([
       supabase
         .from("orders")
         .select("status,created_at,fare")
@@ -340,6 +342,11 @@ export default function AdminDashboard() {
       supabase
         .from("wallet_transactions")
         .select("amount,type,created_at")
+        .order("created_at", { ascending: false })
+        .limit(2000),
+      supabase
+        .from("earnings")
+        .select("amount,cash_collected,commission,created_at")
         .order("created_at", { ascending: false })
         .limit(2000),
     ]);
@@ -372,6 +379,17 @@ export default function AdminDashboard() {
         walletRes.data.map((tx: any) => ({
           amount: Number(tx.amount ?? 0),
           type: tx.type === "debit" ? "debit" : "credit",
+          created_at: tx.created_at,
+        })),
+      );
+    }
+
+    if (!earningsRes.error && earningsRes.data) {
+      setEarningTxs(
+        earningsRes.data.map((tx: any) => ({
+          amount: Number(tx.amount ?? 0),
+          cash_collected: Number(tx.cash_collected ?? 0),
+          commission: Number(tx.commission ?? 0),
           created_at: tx.created_at,
         })),
       );
@@ -439,9 +457,18 @@ export default function AdminDashboard() {
   );
   const monthlyRevenue = monthlyDelivered.reduce((sum, o) => sum + o.order_value, 0);
   const monthlyCommission = monthlyRevenue * 0.05;
-  const monthlyWalletCollected = walletTxs
+  const monthlyWalletCreditsFromWalletTx = walletTxs
     .filter((tx) => tx.type === "credit" && new Date(tx.created_at).getTime() >= monthStart.getTime())
     .reduce((sum, tx) => sum + tx.amount, 0);
+
+  const monthlyWalletCreditsFromEarnings = earningTxs
+    .filter((tx) => new Date(tx.created_at).getTime() >= monthStart.getTime())
+    .reduce((sum, tx) => sum + tx.cash_collected, 0);
+
+  const monthlyWalletCollected =
+    monthlyWalletCreditsFromWalletTx > 0
+      ? monthlyWalletCreditsFromWalletTx
+      : monthlyWalletCreditsFromEarnings;
 
   const paySettlement = (id: number) => {
     setSettlements(p => p.map(s => s.id === id ? { ...s, status:"paid" } : s));
@@ -922,6 +949,9 @@ export default function AdminDashboard() {
       </div>
       <div className="bg-white rounded-2xl border border-border p-4 text-sm text-muted-foreground">
         تم تحصيل <span className="text-emerald-700" style={{ fontWeight:700 }}>{monthlyWalletCollected.toLocaleString("ar-EG")} ج.م</span> داخل المحافظ خلال نفس الفترة.
+        {monthlyWalletCreditsFromWalletTx <= 0 && monthlyWalletCreditsFromEarnings > 0 && (
+          <span className="text-xs block mt-1">(المصدر: أرباح الطيارين من تطبيق الموبايل)</span>
+        )}
       </div>
       <div className="bg-white rounded-2xl border border-border">
         <div className="p-4 border-b border-border flex items-center gap-3">

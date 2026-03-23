@@ -100,12 +100,19 @@ router.post("/drivers/:id/earnings", async (req, res) => {
     if (isNaN(driverId)) {
       return res.status(400).json({ error: "Invalid driver id" });
     }
-    const { amount, cashCollected, commission, orderId } = req.body;
+    const { amount, cashCollected, commission, orderId, earningDate, tripsCount } = req.body;
     const today = new Date().toISOString().split("T")[0];
 
     let amountValue = Number(amount ?? 0);
     let cashCollectedValue = Number(cashCollected ?? 0);
     let commissionValue = Number(commission ?? 0);
+    const normalizedTripsCount = Number.isFinite(Number(tripsCount))
+      ? Math.max(1, Math.floor(Number(tripsCount)))
+      : 1;
+    const normalizedEarningDate =
+      typeof earningDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(earningDate)
+        ? earningDate
+        : today;
 
     // If linked to an order, use DB financial values as the source of truth.
     if (orderId != null) {
@@ -134,7 +141,8 @@ router.post("/drivers/:id/earnings", async (req, res) => {
       .values({
         driverId,
         orderId: orderId ?? null,
-        earningDate: today,
+        earningDate: normalizedEarningDate,
+        tripsCount: normalizedTripsCount,
         amount: String(amountValue),
         cashCollected: String(cashCollectedValue),
         commission: String(commissionValue),

@@ -82,6 +82,8 @@ export interface WeeklyEarning {
   commission: number;
 }
 
+type SeededWeeklyEarning = WeeklyEarning & { isoDate: string };
+
 export interface Driver {
   id: number;
   name: string;
@@ -123,6 +125,7 @@ interface AppContextType {
   requestLocationPermission: () => Promise<boolean>;
   navigateToDestination: () => void;
   refreshEarnings: () => Promise<void>;
+  seedMockWalletData: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -143,6 +146,39 @@ function getDistanceMeters(
     sinLat * sinLat +
     Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
   return 2 * earthRadiusM * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+}
+
+function buildMockWeeklyEarnings(driverId: number): SeededWeeklyEarning[] {
+  const ARABIC_DAYS: Record<number, string> = {
+    0: "الأحد",
+    1: "الاثنين",
+    2: "الثلاثاء",
+    3: "الأربعاء",
+    4: "الخميس",
+    5: "الجمعة",
+    6: "السبت",
+  };
+
+  const now = new Date();
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() - (6 - i));
+    const isoDate = d.toISOString().slice(0, 10);
+    const seed = driverId * 31 + d.getDate() * 17 + i * 13;
+    const trips = 3 + (seed % 7);
+    const earnings = 140 + (seed % 9) * 35;
+    const cashCollected = 80 + (seed % 6) * 28;
+    const commission = Math.round(earnings * 0.12);
+
+    return {
+      date: ARABIC_DAYS[d.getDay()],
+      isoDate,
+      trips,
+      earnings,
+      cashCollected,
+      commission,
+    };
+  });
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -196,6 +232,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsLoadingEarnings(false);
     }
   }, [driver]);
+
+  const seedMockWalletData = useCallback(async () => {
+    if (!driver) return;
+
+    setIsLoadingEarnings(true);
+    try {
+      const mockRows = buildMockWeeklyEarnings(driver.id);
+
+      await Promise.all(
+        mockRows.map((row) =>
+          apiClient.recordEarning(driver.id, {
+            amount: row.earnings,
+            cashCollected: row.cashCollected,
+            commission: row.commission,
+            earningDate: row.isoDate,
+            tripsCount: row.trips,
+          })
+        )
+      );
+
+      await refreshEarnings();
+    } catch (err) {
+      console.warn("Failed to seed mock wallet data:", err);
+      const fallback = buildMockWeeklyEarnings(driver.id);
+      setWeeklyEarnings(
+        fallback.map(({ isoDate, ...rest }) => rest)
+      );
+    } finally {
+      setIsLoadingEarnings(false);
+    }
+  }, [driver, refreshEarnings]);
 
   useEffect(() => {
     driverRef.current = driver;
@@ -843,6 +910,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     requestLocationPermission,
     navigateToDestination,
     refreshEarnings,
+    seedMockWalletData,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
