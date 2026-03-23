@@ -24,6 +24,8 @@ import {
   type ApiOrderTracking,
   type ApiOrderRoute,
 } from "@/lib/api";
+import { OfflineStorage } from "@/lib/offlineStorage";
+import { startAutoSync, stopAutoSync, getSyncStats, hasPendingOperations } from "@/lib/syncManager";
 
 export type OrderStatus =
   | "to_restaurant"
@@ -210,24 +212,72 @@ export function AppProvider({ children }: { children: ReactNode }) {
     at: number;
   } | null>(null);
 
+  // Initialize app: restore from offline storage on mount
+  useEffect(() => {
+    const restoreFromOfflineStorage = async () => {
+      try {
+        const auth = await OfflineStorage.getAuth();
+        if (auth) {
+          console.log('[AppContext] Restoring from offline storage...');
+          setDriver(auth.driver);
+          setTenantId(auth.tenantId);
+          setUserRole(auth.role as UserRole);
+          setApiTenantContext({ tenantId: auth.tenantId, role: auth.role });
+          setIsAuthenticated(true);
+
+          // Restore other data
+          const [location, earnings] = await Promise.all([
+            OfflineStorage.getLocation(),
+            OfflineStorage.getWeeklyEarnings(),
+          ]);
+
+          if (location) {
+            setDriverLocation(location);
+          }
+          if (earnings.length > 0) {
+            setWeeklyEarnings(earnings);
+          }
+
+          // Start sync if driver role
+          if (auth.role === 'driver') {
+            setTimeout(() => {
+              startAutoSync();
+            }, 2000);
+          }
+        }
+      } catch (e) {
+        console.error('[AppContext] Failed to restore from offline storage:', e);
+      }
+    };
+
+    restoreFromOfflineStorage();
+  }, []);
+
   // Fetch weekly earnings from real API
   const refreshEarnings = useCallback(async () => {
     if (!driver) return;
     setIsLoadingEarnings(true);
     try {
       const data = await apiClient.getWeeklyEarnings(driver.id);
-      setWeeklyEarnings(
-        data.map((d: ApiWeeklyEarning) => ({
-          date: d.date,
-          trips: d.trips,
-          earnings: d.earnings,
-          cashCollected: d.cashCollected,
-          commission: d.commission,
-        }))
-      );
+      const earnings = data.map((d: ApiWeeklyEarning) => ({
+        date: d.date,
+        trips: d.trips,
+        earnings: d.earnings,
+        cashCollected: d.cashCollected,
+        commission: d.commission,
+      }));
+      setWeeklyEarnings(earnings);
+      // Save to offline storage
+      await OfflineStorage.saveWeeklyEarnings(earnings);
     } catch (err) {
       console.warn("Failed to fetch earnings:", err);
-      setWeeklyEarnings([]);
+      // Try to load from offline storage on error
+      const cached = await OfflineStorage.getWeeklyEarnings();
+      if (cached.length > 0) {
+        setWeeklyEarnings(cached);
+      } else {
+        setWeeklyEarnings([]);
+      }
     } finally {
       setIsLoadingEarnings(false);
     }
@@ -248,6 +298,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             commission: row.commission,
             earningDate: row.isoDate,
             tripsCount: row.trips,
+          }).catch(err => {
+            // If offline, queue the earning
+            console.warn('[AppContext] Earning save failed, queuing for sync:', err);
+            return OfflineStorage.addPendingEarning({
+              amount: row.earnings,
+              cashCollected: row.cashCollected,
+              commission: row.commission,
+              earningDate: row.isoDate,
+              tripsCount: row.trips,
+            });
           })
         )
       );
@@ -426,7 +486,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       heading: newLoc.heading,
       speed: newLoc.speed,
       orderId: currentOrder ? parseInt(currentOrder.id) : null,
-    }).catch(() => {});
+    }).catch(err => {
+      // If offline, queue the location update
+      console.warn('[AppContext] Location save failed, queuing for sync:', err);
+      OfflineStorage.addPendingLocation({
+        latitude: newLoc.latitude,
+        longitude: newLoc.longitude,
+        accuracy: newLoc.accuracy,
+        heading: newLoc.heading,
+        speed: newLoc.speed,
+        orderId: currentOrder ? parseInt(currentOrder.id) : null,
+        timestamp: newLoc.timestamp,
+      }).catch(e => console.error('[AppContext] Failed to queue location:', e));
+    });
   }, []);
 
   const maybeRefreshActiveRoute = useCallback((newLoc: DriverLocation) => {
@@ -455,6 +527,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const applyDriverLocation = useCallback((newLoc: DriverLocation) => {
     setDriverLocation(newLoc);
     setIsTrackingLocation(true);
+
+    // Save location to offline storage
+    OfflineStorage.saveLocation(newLoc).catch(e => 
+      console.warn('[AppContext] Failed to save location:', e)
+    );
 
     const now = Date.now();
     if (now - lastSavedLocationRef.current > 5000) {
@@ -680,25 +757,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(true);
 
       // Set immediate local profile to avoid blank screens while API resolves.
-      setDriver({
+      const tempDriver = {
         id: 1,
         name: "سائق بايلوت",
         phone,
         avatar: "س",
-        rank: "gold",
+        rank: "gold" as const,
         balance: -85.5,
         creditLimit: 500,
         totalTrips: 0,
         rating: 4.8,
-      });
+      };
+      setDriver(tempDriver);
 
       fetchDriver(phone).then((d) => {
         if (d) {
           setDriver(d);
+          // Save to offline storage
+          OfflineStorage.saveAuth(d, normalizedTenant, role).catch(e => 
+            console.warn('[AppContext] Failed to save auth to offline storage:', e)
+          );
           if (role === "driver") {
             setTimeout(() => {
               setIsOnline(true);
               startIncomingPoll(d.id);
+              // Start auto-sync when driver comes online
+              startAutoSync();
             }, 1200);
           } else {
             setIsOnline(false);
@@ -714,6 +798,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     stopLocationTracking();
     stopIncomingPoll();
+    stopAutoSync();
     setIsAuthenticated(false);
     setTenantId("pilot-main");
     setUserRole("driver");
@@ -727,6 +812,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setRoutePolyline(null);
     setRouteEta(null);
     setRouteSteps([]);
+    // Clear offline storage
+    OfflineStorage.clearAuth().catch(e => 
+      console.warn('[AppContext] Failed to clear offline storage:', e)
+    );
   }, [stopLocationTracking, stopIncomingPoll]);
 
   const toggleOnline = useCallback(() => {
