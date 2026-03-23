@@ -143,28 +143,38 @@ export const saveDrivers = (d: Driver[]) => {
   driversCache = [...d];
   if (!supabase) return;
 
-  const payload = d.map((x) => ({
-    id: x.id,
-    name: x.name,
-    phone: x.phone,
-    rank: x.rank,
-    status: x.status,
-    wallet_balance: x.wallet,
-    orders_count: x.orders,
-    rating: x.rating,
-    has_warning: x.warning,
-    lat: x.lat,
-    lng: x.lng,
-  }));
+  void Promise.all(
+    d.map(async (x) => {
+      const id = Number(x.id);
+      if (!Number.isFinite(id)) return;
 
-  void supabase.from("drivers").upsert(payload, { onConflict: "id" });
+      const { error } = await supabase
+        .from("drivers")
+        .update({
+          name: x.name,
+          phone: x.phone,
+          rank: x.rank,
+          status: x.status === "offline" ? "inactive" : "active",
+          balance: x.wallet,
+          total_trips: x.orders,
+          rating: x.rating,
+          is_online: x.status !== "offline",
+          last_seen_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) {
+        console.error("saveDrivers update failed", error.message);
+      }
+    }),
+  );
 };
 
 export async function addDriver(data: Pick<Driver,'name'|'phone'|'pin'|'rank'|'vehicleType'>): Promise<Driver> {
   const drivers = [...driversCache];
   const d: Driver = {
     ...data,
-    id: crypto.randomUUID(),
+    id: `tmp-${crypto.randomUUID()}`,
     status: 'offline',
     wallet: 0, orders: 0, rating: 5.0, warning: false,
     lat: 30.0444 + (Math.random() - 0.5) * 0.05,
@@ -180,18 +190,18 @@ export async function addDriver(data: Pick<Driver,'name'|'phone'|'pin'|'rank'|'v
   const { data: inserted, error } = await supabase
     .from("drivers")
     .insert({
-      id: d.id,
       name: d.name,
       phone: d.phone,
+      password_hash: `pin_${d.pin || "1234"}`,
+      avatar_letter: d.name.trim().charAt(0) || "م",
       rank: d.rank,
-      status: d.status,
-      wallet_balance: d.wallet,
-      orders_count: d.orders,
+      status: d.status === "offline" ? "inactive" : "active",
+      balance: d.wallet,
+      credit_limit: 500,
+      total_trips: d.orders,
       rating: d.rating,
-      has_warning: d.warning,
-      lat: d.lat,
-      lng: d.lng,
-      is_active: true,
+      is_online: d.status !== "offline",
+      last_seen_at: new Date().toISOString(),
     })
     .select("*")
     .single();
@@ -239,9 +249,17 @@ export function updateDriverLocation(id: string, lat: number, lng: number): void
 
   if (supabase) {
     void supabase
+      .from("driver_locations")
+      .insert({
+        driver_id: Number(id),
+        latitude: lat,
+        longitude: lng,
+      });
+
+    void supabase
       .from("drivers")
-      .update({ lat, lng, updated_at: new Date().toISOString() })
-      .eq("id", id);
+      .update({ is_online: true, last_seen_at: new Date().toISOString() })
+      .eq("id", Number(id));
   }
 }
 
@@ -253,8 +271,12 @@ export function updateDriverStatus(id: string, status: DriverStatus): void {
   if (supabase) {
     void supabase
       .from("drivers")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", id);
+      .update({
+        status: status === "offline" ? "inactive" : "active",
+        is_online: status !== "offline",
+        last_seen_at: new Date().toISOString(),
+      })
+      .eq("id", Number(id));
   }
 }
 

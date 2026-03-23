@@ -176,7 +176,7 @@ export default function DispatcherDashboard() {
             value: `${Number(o.fare ?? 0).toLocaleString("ar-EG")} ج.م`,
             time: o.created_at ? new Date(o.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "—",
             status: o.status,
-            driverId: o.driver_id ?? undefined,
+            driverId: o.driver_id != null ? String(o.driver_id) : undefined,
             lat: Number(o.customer_latitude ?? 30.0444),
             lng: Number(o.customer_longitude ?? 31.2357),
           })),
@@ -202,8 +202,9 @@ export default function DispatcherDashboard() {
   /* Derived */
   const pendingOrders    = orders.filter(o => o.status==="pending");
   const assignedOrders   = orders.filter(o => o.status==="assigned");
-  const availableDrivers = drivers.filter(d => d.status==="available");
-  const busyDrivers      = drivers.filter(d => d.status==="busy");
+  const busyDriverIds    = new Set(assignedOrders.map((o) => o.driverId).filter(Boolean));
+  const availableDrivers = drivers.filter(d => d.status==="available" && !busyDriverIds.has(d.id));
+  const busyDrivers      = drivers.filter(d => d.status==="busy" || busyDriverIds.has(d.id));
 
   const filteredOrders  = orders.filter(o =>
     !searchOrders || o.id.includes(searchOrders) || o.restaurant.includes(searchOrders) || o.customer.includes(searchOrders)
@@ -215,34 +216,45 @@ export default function DispatcherDashboard() {
   const startAssigning = (orderId: string) => { setAssigningOrderId(orderId); setActiveTab("drivers"); setPanelOpen(true); };
   const cancelAssigning = () => setAssigningOrderId(null);
 
-  const confirmAssignment = (driverId: string) => {
+  const confirmAssignment = async (driverId: string) => {
     if (!assigningOrderId) return;
     const order  = orders.find(o => o.id === assigningOrderId);
     const driver = drivers.find(d => d.id === driverId);
     if (!order || !driver) return;
 
     if (supabase) {
-      void supabase
+      const { error } = await supabase
         .from("orders")
-        .update({ status: "assigned", driver_id: driverId, assigned_at: new Date().toISOString() })
+        .update({ status: "assigned", driver_id: Number(driverId), assigned_at: new Date().toISOString() })
         .eq("external_id", assigningOrderId);
+
+      if (error) {
+        toast.error("فشل تعيين الطيار", { description: error.message });
+        return;
+      }
     }
 
     setOrders(prev => prev.map(o => o.id===assigningOrderId ? { ...o, status:"assigned" as const, driverId } : o));
     const updated = getDrivers().map(d => d.id===driverId ? { ...d, status:"busy" as const } : d);
-    saveDrivers(updated); setDrivers([...updated]);
+    saveDrivers(updated);
+    setDrivers([...updated]);
     setAssigningOrderId(null); setActiveTab("orders");
     toast.success(`✅ تم تعيين ${driver.name} للطلب ${order.id}`, { description:`${order.customer} — ${order.address}` });
   };
 
-  const completeOrder = (orderId: string) => {
+  const completeOrder = async (orderId: string) => {
     const order = orders.find(o => o.id===orderId); if (!order) return;
 
     if (supabase) {
-      void supabase
+      const { error } = await supabase
         .from("orders")
         .update({ status: "delivered", delivered_at: new Date().toISOString() })
         .eq("external_id", orderId);
+
+      if (error) {
+        toast.error("فشل إنهاء الطلب", { description: error.message });
+        return;
+      }
     }
 
     setOrders(prev => prev.filter(o => o.id!==orderId));
